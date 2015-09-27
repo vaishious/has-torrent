@@ -40,7 +40,7 @@ getFiles (BList ((BDict map):xs)) = (pathlist,len) : (getFiles (BList xs))
                                   where (Just (BInt len)) = M.lookup "length" map
                                         (Just (BList list)) = M.lookup "path" map
                                         pathlist = decodePath list
-                                  
+
 decodePath :: [BEncode] -> [FilePath]
 decodePath [] = []
 decodePath ((BString x):xs) = (C.unpack x) : (decodePath xs)
