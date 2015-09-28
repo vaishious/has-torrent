@@ -8,8 +8,8 @@ import qualified Data.Vector as V
 import qualified Data.ByteString.Lazy.Char8 as C
 
 pieceList :: Int64 -> B.ByteString -> [B.ByteString]
-pieceList n bs = (head : (pieceList n bs')) where
-                (head,bs') = B.splitAt n bs
+pieceList n bs = (head : (pieceList n bs'))
+               where (head,bs') = B.splitAt n bs
 
 pieceVector :: B.ByteString -> V.Vector B.ByteString
 pieceVector bs = V.fromList $ pieceList 20 bs
