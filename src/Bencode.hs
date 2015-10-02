@@ -10,8 +10,8 @@ import qualified Data.ByteString.Char8 as C
 import Data.Byteable
 
 pieceList :: Int64 -> B.ByteString -> [B.ByteString]
-pieceList n bs = (head : (pieceList n bs')) where
-                (head,bs') = B.splitAt n bs
+pieceList n bs = (head : (pieceList n bs'))
+               where (head,bs') = B.splitAt n bs
 
 pieceVector :: B.ByteString -> V.Vector B.ByteString
 pieceVector bs = V.fromList $ pieceList 20 bs
