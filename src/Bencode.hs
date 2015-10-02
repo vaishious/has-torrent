@@ -2,10 +2,12 @@ import Data.BEncode
 import qualified Data.ByteString.Lazy as B
 import qualified Data.ByteString.Base16.Lazy as BS
 import qualified Data.Map as M
-import Crypto.Hash
+import Crypto.Hash.SHA1
 import Data.Int
 import qualified Data.Vector as V
-import qualified Data.ByteString.Lazy.Char8 as C
+import qualified Data.ByteString.Lazy.Char8 as LC
+import qualified Data.ByteString.Char8 as C
+import Data.Byteable
 
 pieceList :: Int64 -> B.ByteString -> [B.ByteString]
 pieceList n bs = (head : (pieceList n bs'))
@@ -18,8 +20,8 @@ readAndDecode :: FilePath -> IO (Maybe BEncode)
 readAndDecode fp = do bs <- B.readFile fp
                       return (bRead bs)
 
-infoHash :: Maybe BEncode -> Maybe (Digest SHA1)
-infoHash (Just (BDict be)) = Just $ hashlazy $ bPack infoDict
+infoHash :: Maybe BEncode -> Maybe (C.ByteString)
+infoHash (Just (BDict be)) = Just $ toBytes $ hashlazy $ bPack infoDict
                            where Just infoDict = M.lookup "info" be
 infoHash _ = Nothing
 
@@ -43,4 +45,4 @@ getFiles (BList ((BDict map):xs)) = (pathlist,len) : (getFiles (BList xs))
 
 decodePath :: [BEncode] -> [FilePath]
 decodePath [] = []
-decodePath ((BString x):xs) = (C.unpack x) : (decodePath xs)
+decodePath ((BString x):xs) = (LC.unpack x) : (decodePath xs)
