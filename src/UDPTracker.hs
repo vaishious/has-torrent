@@ -31,11 +31,11 @@ connectConnId = 4497486125440
 connectAction :: Int32
 connectAction = 0
 
-genTransactionId :: IO Int32
-genTransactionId = randomIO
+genRandInt32 :: IO Int32
+genRandInt32 = randomIO
 
 sendConnectRequest :: Int -> Socket -> IO (Maybe Int64)
-sendConnectRequest timeWait sockUDP = do transactionId <- genTransactionId
+sendConnectRequest timeWait sockUDP = do transactionId <- genRandInt32
                                          send sockUDP $ BL.toStrict $ toLazyByteString $ (int64BE connectConnId) `mappend` (int32BE connectAction) `mappend` (int32BE transactionId)
                                          maybeResponse <- timeout (timeWait*1000000) (recv sockUDP 16)
                                          print maybeResponse
