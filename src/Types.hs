@@ -3,6 +3,7 @@ import qualified Data.Vector as V
 import qualified Data.ByteString.Lazy as BL
 import Network.Socket
 import System.IO
+import Data.Word
 
 data File = File {
                    getFilePath :: FilePath,
@@ -19,7 +20,7 @@ data PieceInfo = PieceInfo {
 
 type PeerId = BL.ByteString
 
-type Port = Int
+type Port = Word16
 type AnnounceURL = String
 type AnnounceList = [(AnnounceURL,Port)]
 
