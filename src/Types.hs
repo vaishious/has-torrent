@@ -19,8 +19,9 @@ data PieceInfo = PieceInfo {
 
 type PeerId = BL.ByteString
 
-type AnnounceURL = [Char]
-type AnnounceList = [AnnounceURL]
+type Port = Int
+type AnnounceURL = String
+type AnnounceList = [(AnnounceURL,Port)]
 
 data Block = Block {
                      getDownloadStatus :: Bool,
@@ -36,8 +37,12 @@ data Piece = Piece {
 type PieceList = V.Vector Piece
 
 type ConnectionId = BL.ByteString
+
+data TrackerProtocol = HTTP | UDP
 data Tracker = Tracker {
-                         getURL :: AnnounceURL,
+                         getProtocol :: TrackerProtocol,    --
+                         getURL :: AnnounceURL,             -- Are these three lines required
+                         getPort :: Port,                   --
                          getSocket :: Socket,
                          getConnId :: ConnectionId
                        }
@@ -49,7 +54,7 @@ data PeerState = PeerState {
                              getPeerChoking :: Bool,
                              getPeerInterested :: Bool
                            }
-data Peer = NoHandshake
+data Peer = NoHandshake HostAddress Port       -- HostAddress is defined in Network.Socket as a Word32
           | Handshake PeerState Socket
 type PeerList = V.Vector Peer
 
