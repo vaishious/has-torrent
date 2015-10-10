@@ -4,6 +4,8 @@ import qualified Data.ByteString.Lazy as BL
 import Network.Socket
 import System.IO
 import Data.Word
+import Data.Time
+import Data.Set
 
 data File = File {
                    getFilePath :: FilePath,
@@ -11,18 +13,21 @@ data File = File {
                  }
 type FileList = V.Vector File
 
-type Hash = BL.ByteString
-type PieceHash = V.Vector Hash
-data PieceInfo = PieceInfo {
-                             getPieceLength :: Int,
-                             getPieceHash :: PieceHash
+newtype Hash = Hash {getHash :: BL.ByteString}
+data SinglePieceInfo = SinglePieceInfo {
+                                         getPieceLength :: Int,
+                                         getPieceHash :: Hash
+                                       }
+type PieceInfo = V.Vector SinglePieceInfo
+
+data Tracker = UDPTracker {
+                            getUDPHostAddress :: HostAddress,
+                            getUDPPort :: PortNumber
+                          }
+             | HTTPTracker {
+                             getURL :: String
                            }
-
-type PeerId = BL.ByteString
-
-type Port = Word16
-type AnnounceURL = String
-type AnnounceList = [(AnnounceURL,Port)]
+type TrackerList = [Tracker]
 
 data Block = Block {
                      getDownloadStatus :: Bool,
@@ -37,30 +42,43 @@ data Piece = Piece {
                    }
 type PieceList = V.Vector Piece
 
-type ConnectionId = BL.ByteString
-
-data TrackerProtocol = HTTP | UDP
-data Tracker = Tracker {
-                         getProtocol :: TrackerProtocol,    --
-                         getURL :: AnnounceURL,             -- Are these three lines required
-                         getPort :: Port,                   --
-                         getSocket :: Socket,
-                         getConnId :: ConnectionId
-                       }
-             | NoTracker
-
 data PeerState = PeerState {
                              getAmChoking :: Bool,
                              getAmInterested :: Bool,
                              getPeerChoking :: Bool,
                              getPeerInterested :: Bool
                            }
-data Peer = NoHandshake HostAddress Port       -- HostAddress is defined in Network.Socket as a Word32
-          | Handshake PeerState Socket
+data Peer = NoHandshake {
+                          getPeerHostAddress :: HostAddress,
+                          getPeerPort :: PortNumber
+                        }
+          | Handshake {
+                        getPeerState :: PeerState,
+                        getSocket :: Socket,
+                        getRequestTime :: UTCTime,
+                        getResponseTime :: UTCTime,
+                        getEffResponseTime :: UTCTime,
+                        getRequestList :: [RequestId]
+                      }
 type PeerList = V.Vector Peer
 
+newtype RequestId = RequestId (Int,Int) deriving (Ord,Eq)
+data Event = None | Started | Stopped | Completed deriving (Eq)
+
+data Stateless = Stateless {
+                             getInfoHash :: Hash,
+                             getPieceInfo :: PieceInfo,
+                             getPeerId :: Hash,
+                             getTrackers :: TrackerList,
+                             getFileList :: FileList
+                           }
+
 data Torrent = Torrent {
+                         getEvent :: Event,
                          getPieces :: PieceList,
-                         getTracker :: Tracker,
-                         getPeers :: PeerList
+                         getPieceDownOrd :: [Int],
+                         getActiveBlocks :: Set RequestId,
+                         getActiveTracker :: Maybe Tracker,
+                         getActivePeers :: PeerList,
+                         getInactivePeers :: PeerList
                        }
