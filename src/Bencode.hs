@@ -13,6 +13,7 @@ import Types
 import Network.URI
 import Data.Char
 import Data.Maybe
+import Data.List
 
 readAndDecode :: FilePath -> IO (Maybe BEncode)
 readAndDecode fp = do bs <- B.readFile fp
@@ -53,8 +54,8 @@ pieceHashList be = case successiveLookup ["info","pieces"] be of
                         (Just (BString bs)) -> Just $ splitPieceHash bs
                         _                   -> Nothing
 
-getOverallSize :: [([FilePath],Integer)] -> Integer
-getOverallSize = foldr ((+) . snd) 0
+getOverallSize :: FileList -> Integer
+getOverallSize = V.foldr ((+) . getSize) 0
 
 getPieceLength :: Maybe BEncode -> Maybe Integer
 getPieceLength be = case successiveLookup ["info","piece length"] be of
@@ -65,8 +66,8 @@ pieceLengthList :: Integer -> Integer -> [Int]
 pieceLengthList totalSize pieceLength = replicate (fromIntegral $ quot totalSize pieceLength) (fromIntegral pieceLength) ++ last
                                       where last = if mod totalSize pieceLength == 0 then [] else [fromIntegral $ mod totalSize pieceLength]
 
-pieceInfo :: [Int] -> [B.ByteString] -> PieceInfo
-pieceInfo lenList hashList = V.fromList $ zipWith SinglePieceInfo lenList $ map Hash hashList
+pieceInfo :: [Int] -> [B.ByteString] -> FileList -> PieceInfo
+pieceInfo lenList hashList fileList = V.fromList $ zipWith3 SinglePieceInfo lenList (map Hash hashList) (coveredFileList fileList (map fromIntegral (0:lenList)))
 
 -- What if input is not of the type (BList a)?
 announceURL :: BEncode -> String
@@ -76,7 +77,7 @@ announceURL (BList urlList) = LC.unpack url
 announceList :: Maybe BEncode -> Maybe [String]
 announceList be = case successiveLookup ["announce-list"] be of
                           (Just (BList announceList)) -> Just $ map announceURL announceList
-                          _                -> Nothing
+                          _                           -> Nothing
 
 uriToTracker :: String -> Tracker
 uriToTracker uri = case filter isLetter $ uriScheme parsedURI of
@@ -87,3 +88,34 @@ uriToTracker uri = case filter isLetter $ uriScheme parsedURI of
 
 getTrackerList :: [String] -> TrackerList
 getTrackerList = map uriToTracker
+
+runningSum :: [Integer] -> [Integer]
+runningSum = scanl1 (+)
+
+-- Makes list of endpoints lying in either filePositionList or piecePositionList
+rmdups :: [Integer] -> [Integer] -> [Integer]
+rmdups filePositionList piecePositionList = map head . group . sort $ filePositionList ++ piecePositionList
+
+-- For each piece, finds all the file endpoints lying between its endpoints
+piecewiseSplit :: [Integer] -> [Integer] -> [[Integer]]
+piecewiseSplit _ [] = []
+piecewiseSplit allPositionList (y:ys) = le : piecewiseSplit (y:g) ys
+                                      where (le,g) = span (<=y) allPositionList
+
+-- For each file a piece covers, this makes a list of tuples of (file index,offset in file,length in file)
+filewiseSplit :: [Integer] -> [Integer] -> [(Integer,Integer,Integer)]
+filewiseSplit filePositionList (x:y:xs) = if length le > 0 
+                                          then (fromIntegral $ length le - 1 , x - last le , y - x): filewiseSplit filePositionList (y:xs)
+                                          else filewiseSplit filePositionList (y:xs)
+                                        where le = takeWhile (<=x) filePositionList
+filewiseSplit _ _                       = []
+
+allSplit :: [Integer] -> [[Integer]] -> [[(Integer,Integer,Integer)]]
+allSplit filePositionList = map (filewiseSplit filePositionList)
+
+coveredFileList :: FileList -> [Integer] -> [CoveredFileList]
+coveredFileList fileList pieceLengthList = map g $ allSplit filePositionList $ piecewiseSplit (rmdups filePositionList piecePositionList) piecePositionList
+                                         where filePositionList   = (:) 0 $ runningSum $ map getSize (V.toList fileList)
+                                               piecePositionList  = runningSum pieceLengthList
+                                               f (a,b,c)          = CoveredFile (getFilePath $ (V.!) fileList (fromIntegral a)) b (fromIntegral c)
+                                               g a                = V.fromList $ map f a

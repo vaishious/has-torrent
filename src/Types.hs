@@ -24,7 +24,7 @@ type CoveredFileList = V.Vector CoveredFile
 data SinglePieceInfo = SinglePieceInfo {
                                          getPieceLength :: Int,
                                          getPieceHash :: Hash,
-                                         getFileCoveredList :: CoveredFileList
+                                         getCoveredFileList :: CoveredFileList
                                        }
 type PieceInfo = V.Vector SinglePieceInfo
 
