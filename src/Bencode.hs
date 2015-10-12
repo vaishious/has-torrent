@@ -18,7 +18,7 @@ readAndDecode :: FilePath -> IO (Maybe BEncode)
 readAndDecode fp = do bs <- B.readFile fp
                       return (bRead bs)
 
-infoHash :: Maybe BEncode -> Maybe (C.ByteString)
+infoHash :: Maybe BEncode -> Maybe C.ByteString
 infoHash (Just (BDict be)) = Just $ toBytes $ hashlazy $ bPack infoDict
                            where Just infoDict = M.lookup "info" be
 infoHash _ = Nothing
@@ -28,14 +28,14 @@ getFileList = successiveLookup ["info","files"]
 
 getFiles :: BEncode -> [([FilePath],Integer)]
 getFiles (BList []) = []
-getFiles (BList ((BDict map):xs)) = (pathlist,len) : (getFiles (BList xs))
+getFiles (BList (BDict map:xs)) = (pathlist,len) : getFiles (BList xs)
                                   where (Just (BInt len)) = M.lookup "length" map
                                         (Just (BList list)) = M.lookup "path" map
                                         pathlist = decodePath list
 
 decodePath :: [BEncode] -> [FilePath]
 decodePath [] = []
-decodePath ((BString x):xs) = (LC.unpack x) : (decodePath xs)
+decodePath (BString x:xs) = LC.unpack x : decodePath xs
 
 successiveLookup :: [String] -> Maybe BEncode -> Maybe BEncode
 successiveLookup [] be = be
@@ -44,7 +44,7 @@ successiveLookup _ _ = Nothing
 
 splitPieceHash :: B.ByteString -> [B.ByteString]
 splitPieceHash piecehash = case B.length piecehash > 0 of
-                               True -> (head : (splitPieceHash piecehash'))
+                               True -> head : splitPieceHash piecehash'
                                     where (head,piecehash') = B.splitAt 20 piecehash
                                _    -> []
 
@@ -54,8 +54,7 @@ pieceHashList be = case successiveLookup ["info","pieces"] be of
                         _                   -> Nothing
 
 getOverallSize :: [([FilePath],Integer)] -> Integer
-getOverallSize [] = 0
-getOverallSize (x:xs) = (snd x) + (getOverallSize xs)
+getOverallSize = foldr ((+) . snd) 0
 
 getPieceLength :: Maybe BEncode -> Maybe Integer
 getPieceLength be = case successiveLookup ["info","piece length"] be of
@@ -63,7 +62,7 @@ getPieceLength be = case successiveLookup ["info","piece length"] be of
                       _                 -> Nothing
 
 pieceLengthList :: Integer -> Integer -> [Int]
-pieceLengthList totalSize pieceLength = take (fromIntegral $ quot totalSize pieceLength) (repeat $ fromIntegral pieceLength) ++ last
+pieceLengthList totalSize pieceLength = replicate (fromIntegral $ quot totalSize pieceLength) (fromIntegral pieceLength) ++ last
                                       where last = if mod totalSize pieceLength == 0 then [] else [fromIntegral $ mod totalSize pieceLength]
 
 pieceInfo :: [Int] -> [B.ByteString] -> PieceInfo
