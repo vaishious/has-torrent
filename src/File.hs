@@ -1,3 +1,4 @@
+module File where
 import System.IO
 import System.Directory
 import System.Posix.IO

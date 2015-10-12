@@ -14,13 +14,17 @@ import Network.URI
 import Data.Char
 import Data.Maybe
 import Data.List
+import File
+import Control.Monad (replicateM)
+import System.Random
+import Data.Word
 
 readAndDecode :: FilePath -> IO (Maybe BEncode)
 readAndDecode fp = do bs <- B.readFile fp
-                      return (bRead bs)
+                      return $ bRead bs
 
-infoHash :: Maybe BEncode -> Maybe C.ByteString
-infoHash (Just (BDict be)) = Just $ toBytes $ hashlazy $ bPack infoDict
+infoHash :: Maybe BEncode -> Maybe B.ByteString
+infoHash (Just (BDict be)) = Just $ B.fromStrict $ toBytes $ hashlazy $ bPack infoDict
                            where Just infoDict = M.lookup "info" be
 infoHash _ = Nothing
 
@@ -28,11 +32,11 @@ getFileList :: Maybe BEncode -> Maybe BEncode
 getFileList = successiveLookup ["info","files"]
 
 getFiles :: BEncode -> [([FilePath],Integer)]
-getFiles (BList []) = []
 getFiles (BList (BDict map:xs)) = (pathlist,len) : getFiles (BList xs)
-                                  where (Just (BInt len)) = M.lookup "length" map
-                                        (Just (BList list)) = M.lookup "path" map
-                                        pathlist = decodePath list
+                                where (Just (BInt len))   = M.lookup "length" map
+                                      (Just (BList list)) = M.lookup "path" map
+                                      pathlist            = decodePath list
+getFiles _                      = []
 
 decodePath :: [BEncode] -> [FilePath]
 decodePath [] = []
@@ -104,7 +108,7 @@ piecewiseSplit allPositionList (y:ys) = le : piecewiseSplit (y:g) ys
 
 -- For each file a piece covers, this makes a list of tuples of (file index,offset in file,length in file)
 filewiseSplit :: [Integer] -> [Integer] -> [(Integer,Integer,Integer)]
-filewiseSplit filePositionList (x:y:xs) = if length le > 0 
+filewiseSplit filePositionList (x:y:xs) = if not (null le)
                                           then (fromIntegral $ length le - 1 , x - last le , y - x): filewiseSplit filePositionList (y:xs)
                                           else filewiseSplit filePositionList (y:xs)
                                         where le = takeWhile (<=x) filePositionList
@@ -119,3 +123,23 @@ coveredFileList fileList pieceLengthList = map g $ allSplit filePositionList $ p
                                                piecePositionList  = runningSum pieceLengthList
                                                f (a,b,c)          = CoveredFile (getFilePath $ (V.!) fileList (fromIntegral a)) b (fromIntegral c)
                                                g a                = V.fromList $ map f a
+
+toFile :: FilePath -> ([FilePath],Integer) -> File
+toFile rootPath (listPath,size) = File (fullFoldPath rootPath listPath) size
+
+fileList :: FilePath -> [([FilePath],Integer)] -> FileList
+fileList rootPath files = V.fromList $ map (toFile rootPath) files
+
+genPeerID :: IO B.ByteString
+genPeerID = do let randomWord8 = getStdRandom random :: IO Word8
+               word8List <- replicateM 20 randomWord8
+               return $ B.pack word8List
+
+setStateless :: FilePath -> FilePath -> IO (Maybe Stateless)
+setStateless torrentFile rootPath = do be             <- readAndDecode torrentFile
+                                       peerid         <- genPeerID
+                                       let infohash    = Hash $ fromJust $ infoHash be
+                                       let trackerList = getTrackerList $ fromJust $ announceList be
+                                       let filelist    = fileList rootPath (getFiles (fromJust (Bencode.getFileList be)))
+                                       let pieceinfo   = pieceInfo (pieceLengthList (getOverallSize filelist) (fromJust $ Bencode.getPieceLength be)) (fromJust $ pieceHashList be) filelist
+                                       return $ Just $ Stateless infohash pieceinfo (Hash peerid) trackerList filelist
