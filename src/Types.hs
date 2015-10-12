@@ -14,14 +14,23 @@ data File = File {
 type FileList = V.Vector File
 
 newtype Hash = Hash {getHash :: BL.ByteString}
+
+data CoveredFile = CoveredFile {
+                                 getCoveredFilePath :: FilePath,
+                                 getCoveredFileOffset :: Integer,
+                                 getCoveredFileLength :: Int
+                               }
+type CoveredFileList = V.Vector CoveredFile
 data SinglePieceInfo = SinglePieceInfo {
                                          getPieceLength :: Int,
-                                         getPieceHash :: Hash
+                                         getPieceHash :: Hash,
+                                         getFileCoveredList :: CoveredFileList
                                        }
 type PieceInfo = V.Vector SinglePieceInfo
 
+-- Temporarily modified UDPHostAddress to String type
 data Tracker = UDPTracker {
-                            getUDPHostAddress :: HostAddress,
+                            getUDPHostAddress :: String,
                             getUDPPort :: PortNumber
                           }
              | HTTPTracker {
