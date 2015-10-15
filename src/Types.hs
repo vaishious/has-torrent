@@ -92,28 +92,28 @@ data Torrent = Torrent {
                          getInactivePeers :: PeerList
                        }
 
-data Message = InvalidMessage
-             | KeepAlive
-             | Choke
-             | Unchoke
-             | Interested
-             | NotInterested
-             | Have {
-                      getPieceIndex :: Int
-                    }
-             | Request {
-                         getIndex :: Int,
-                         getBegin :: Int,
-                         getLength :: Int
+data Message = InvalidMsg
+             | KeepAliveMsg
+             | ChokeMsg
+             | UnchokeMsg
+             | InterestedMsg
+             | NotInterestedMsg
+             | HaveMsg {
+                         getPieceIndex :: Int
                        }
-             | Piece {
-                       getIndex :: Int,
-                       getBegin :: Int,
-                       getLength :: Int,
-                       getBlock :: BL.ByteString
-                     }
-             | Cancel {
-                        getIndex :: Int,
-                        getBegin :: Int,
-                        getLength :: Int
-                      }
+             | RequestMsg {
+                            getPieceIndex :: Int,
+                            getBlockBegin :: Int,
+                            getBlockLength :: Int
+                          }
+             | PieceMsg {
+                          getPieceIndex :: Int,
+                          getBlockBegin :: Int,
+                          getBlockLength :: Int,
+                          getBlock :: BL.ByteString
+                        }
+             | CancelMsg {
+                           getPieceIndex :: Int,
+                           getBlockBegin :: Int,
+                           getBlockLength :: Int
+                         }

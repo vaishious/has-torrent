@@ -1,13 +1,11 @@
 module Bencode where
 import Data.BEncode
 import qualified Data.ByteString.Lazy as B
-import qualified Data.ByteString.Base16.Lazy as BS
 import qualified Data.Map as M
 import Crypto.Hash.SHA1
 import Data.Int
 import qualified Data.Vector as V
 import qualified Data.ByteString.Lazy.Char8 as LC
-import qualified Data.ByteString.Char8 as C
 import Data.Byteable
 import Types
 import Network.URI
