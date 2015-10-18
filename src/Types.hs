@@ -92,8 +92,7 @@ data Torrent = Torrent {
                          getInactivePeers :: PeerList
                        }
 
-data Message = InvalidMsg
-             | KeepAliveMsg
+data Message = KeepAliveMsg
              | ChokeMsg
              | UnchokeMsg
              | InterestedMsg
