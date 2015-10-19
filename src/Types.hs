@@ -28,9 +28,9 @@ data SinglePieceInfo = SinglePieceInfo {
                                        }
 type PieceInfo = V.Vector SinglePieceInfo
 
--- Temporarily modified UDPHostAddress to String type
+-- Temporarily modified UDPHostName to String type
 data Tracker = UDPTracker {
-                            getUDPHostAddress :: String,
+                            getUDPHostName :: String,
                             getUDPPort :: PortNumber
                           }
              | HTTPTracker {
