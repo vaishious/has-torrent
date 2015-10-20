@@ -1,3 +1,4 @@
+module UDPTracker where
 import Network.Socket hiding (send, sendTo, recv, recvFrom)
 import Network.Socket.ByteString
 import Network.BSD
@@ -30,16 +31,22 @@ connectAction = 0
 announceAction :: Int32
 announceAction = 1
 
+decodeEvent :: (Num a) => Event -> a
+decodeEvent None = 0
+decodeEvent Completed = 1
+decodeEvent Started = 2
+decodeEvent Stopped = 3
+
 toStrictByteString :: Builder -> B.ByteString
 toStrictByteString = BL.toStrict . toLazyByteString
 
-sendConnectReq :: Socket -> Int -> IO (Maybe BL.ByteString)
-sendConnectReq sockUDP timeWaitSec = do transIdReq <- randomIO
-                                        send sockUDP $ toStrictByteString $ execWriter $ do tell $ int64BE connectConnId
-                                                                                            tell $ int32BE connectAction
-                                                                                            tell $ int32BE transIdReq
-                                        maybeResponse <- timeout (timeWaitSec*1000000) $ recv sockUDP 16
-                                        return $ liftM BL.fromStrict maybeResponse >>= validConnectRes transIdReq
+sendConnectReq :: Socket -> SockAddr -> Int -> IO (Maybe BL.ByteString)
+sendConnectReq sockUDP trackerAddr timeWaitSec = do transIdReq <- randomIO
+                                                    sendTo sockUDP (toStrictByteString $ execWriter $ do tell $ int64BE connectConnId
+                                                                                                         tell $ int32BE connectAction
+                                                                                                         tell $ int32BE transIdReq) trackerAddr
+                                                    maybeResponse <- timeout (timeWaitSec*1000000) $ recv sockUDP 16
+                                                    return $ liftM BL.fromStrict maybeResponse >>= validConnectRes transIdReq
 
 validConnectRes :: Int32 -> BL.ByteString -> Maybe BL.ByteString
 validConnectRes transIdReq response = do guard $ BL.length response >= 16
@@ -49,29 +56,31 @@ validConnectRes transIdReq response = do guard $ BL.length response >= 16
                                          guard $ (decode transIdRes :: Int32) == transIdReq
                                          return connIdRes
 
-sendAnnounceReq :: Tracker -> PieceList -> Hash -> PeerId -> Int -> IO PeerList
-sendAnnounceReq NoTracker _ _ _ _ = return V.empty
-sendAnnounceReq tracker pieces infoHash peerId timeWaitSec = do transIdReq <- randomIO
-                                                                key <- randomIO
-                                                                port <- socketPort $ getSocket tracker
-                                                                send (getSocket tracker) $ toStrictByteString $ execWriter $ do
-                                                                    tell $ lazyByteString $ getConnId tracker
-                                                                    tell $ int32BE announceAction
-                                                                    tell $ int32BE transIdReq
-                                                                    tell $ lazyByteString infoHash
-                                                                    tell $ lazyByteString peerId
-                                                                    tell $ int64BE $ getDownload pieces
-                                                                    tell $ int64BE $ getLeft pieces
-                                                                    tell $ int64BE 0
-                                                                    tell $ int32BE 2
-                                                                    tell $ int32BE 0
-                                                                    tell $ int32BE key
-                                                                    tell $ int64BE (-1)
-                                                                    tell $ int16BE $ fromIntegral port
-                                                                maybeResponse <- timeout (timeWaitSec*100000) $ recv (getSocket tracker) 320
-                                                                case liftM BL.fromStrict maybeResponse >>= validAnnounceRes transIdReq of
-                                                                     Nothing -> return V.empty
-                                                                     Just peerRes -> return $ extractPeers peerRes
+--sendAnnounceReq :: Tracker -> PieceList -> Hash -> PeerId -> Int -> IO PeerList
+--sendAnnounceReq tracker pieces infoHash peerId timeWaitSec = do transIdReq <- randomIO
+sendAnnounceReq :: BL.ByteString -> SockAddr -> Stateless -> Int -> Torrent -> IO PeerList
+sendAnnounceReq connId trackerAddr constants timeWaitSec stateful = do transIdReq <- randomIO
+                                                                       key <- randomIO
+                                                                       port <- socketPort $ getUDPSocket constants
+                                                                       sendTo (getUDPSocket constants) (toStrictByteString $ execWriter $ do
+                                                                            tell $ lazyByteString connId
+                                                                            tell $ int32BE announceAction
+                                                                            tell $ int32BE transIdReq
+                                                                            tell $ lazyByteString $ getHash $ getInfoHash constants
+                                                                            tell $ lazyByteString $ getHash $ getPeerId constants
+                                                                            tell $ int64BE $ getDownload $ getPieces stateful
+                                                                            tell $ int64BE $ getLeft $ getPieces stateful
+                                                                            -- Uploaded = 0?
+                                                                            tell $ int64BE 0
+                                                                            tell $ int32BE $ decodeEvent $ getEvent stateful
+                                                                            tell $ int32BE 0
+                                                                            tell $ int32BE key
+                                                                            tell $ int64BE (-1)
+                                                                            tell $ int16BE $ fromIntegral port) trackerAddr
+                                                                       maybeResponse <- timeout (timeWaitSec*100000) $ recv (getUDPSocket constants) 320
+                                                                       case liftM BL.fromStrict maybeResponse >>= validAnnounceRes transIdReq of
+                                                                            Nothing -> return V.empty
+                                                                            Just peerRes -> return $ extractPeers peerRes
 
 validAnnounceRes :: Int32 -> BL.ByteString -> Maybe BL.ByteString
 validAnnounceRes transIdReq response = do guard $ BL.length response >=20
@@ -85,7 +94,14 @@ extractPeers :: BL.ByteString -> PeerList
 extractPeers peerRes = if BL.length peerRes < 6 then V.empty
                                                 else let (first,rest) = BL.splitAt 6 peerRes
                                                          (ip,port) = BL.splitAt 4 first
-                                                     in NoHandshake (decode ip :: Word32) (decode port :: Word16) `V.cons` extractPeers rest
+                                                     in NoHandshake (decode ip :: Word32) (fromIntegral (decode port :: Word16)) `V.cons` extractPeers rest
+
+getPeers :: Tracker -> Stateless -> Torrent -> IO PeerList
+getPeers udpTracker constants stateful = do trackerAddr <- makeSockAddr udpTracker
+                                            -- Tracker timeout for each connect set to 30 seconds. Change?
+                                            maybeConnect <- sendConnectReq (getUDPSocket constants) trackerAddr 30
+                                            case maybeConnect of Nothing -> return V.empty
+                                                                 Just connId -> sendAnnounceReq connId trackerAddr constants 30 stateful
 
 getPieceDownload :: Piece -> Int
 getPieceDownload (Piece _ blocks) = V.foldl (\a b -> if getDownloadStatus b then a + getLength b else a) 0 blocks
