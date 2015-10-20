@@ -16,6 +16,7 @@ import System.Random
 import Control.Monad
 import Control.Monad.Writer
 import Types
+import TypesHelp
 
 --TODO: Handle Exceptions?
 makeSockAddr :: Tracker -> IO SockAddr
@@ -30,12 +31,6 @@ connectAction = 0
 
 announceAction :: Int32
 announceAction = 1
-
-decodeEvent :: (Num a) => Event -> a
-decodeEvent None = 0
-decodeEvent Completed = 1
-decodeEvent Started = 2
-decodeEvent Stopped = 3
 
 toStrictByteString :: Builder -> B.ByteString
 toStrictByteString = BL.toStrict . toLazyByteString
@@ -102,15 +97,3 @@ getPeers udpTracker constants stateful = do trackerAddr <- makeSockAddr udpTrack
                                             maybeConnect <- sendConnectReq (getUDPSocket constants) trackerAddr 30
                                             case maybeConnect of Nothing -> return V.empty
                                                                  Just connId -> sendAnnounceReq connId trackerAddr constants 30 stateful
-
-getPieceDownload :: Piece -> Int
-getPieceDownload (Piece _ blocks) = V.foldl (\a b -> if getDownloadStatus b then a + getLength b else a) 0 blocks
-
-getDownload :: PieceList -> Int64
-getDownload = V.foldl (\a p -> a + fromIntegral (getPieceDownload p)) 0
-
-getPieceLeft :: Piece -> Int
-getPieceLeft (Piece _ blocks) = V.foldl (\a b -> if getDownloadStatus b then a else a + getLength b) 0 blocks
-
-getLeft :: PieceList -> Int64
-getLeft = V.foldl (\a p -> a + fromIntegral (getPieceLeft p)) 0
