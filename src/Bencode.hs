@@ -9,6 +9,7 @@ import qualified Data.ByteString.Lazy.Char8 as LC
 import Data.Byteable
 import Types
 import Network.URI
+import Network.Socket
 import Data.Char
 import Data.Maybe
 import Data.List
@@ -125,6 +126,7 @@ coveredFileList fileList pieceLengthList = map g $ allSplit filePositionList $ p
                                                f (a,b,c)          = CoveredFile (getFilePath $ (V.!) fileList (fromIntegral a)) b (fromIntegral c)
                                                g a                = V.fromList $ map f a
 
+--TODO: Relocate code.
 toFile :: FilePath -> ([FilePath],Integer) -> File
 toFile rootPath (listPath,size) = File (fullFoldPath rootPath listPath) size
 
@@ -136,12 +138,26 @@ genPeerID = do let randomWord8 = getStdRandom random :: IO Word8
                word8List <- replicateM lenHash randomWord8
                return $ B.pack word8List
 
+makeUDPSock :: IO Socket
+makeUDPSock = do sock <- socket AF_INET Datagram 17
+                 bind sock (SockAddrInet aNY_PORT iNADDR_ANY)
+                 return sock
+
+listeningTCP :: PortNumber -> IO Socket
+listeningTCP udpPort = do sock <- socket AF_INET Stream defaultProtocol
+                          bind sock (SockAddrInet udpPort iNADDR_ANY)
+                          listen sock 2
+                          return sock
+
 setStateless :: FilePath -> FilePath -> IO (Maybe Stateless)
 setStateless torrentFile rootPath = do be             <- readAndDecode torrentFile
                                        peerID         <- genPeerID
+                                       udpSocket      <- makeUDPSock
+                                       port           <- socketPort udpSocket
+                                       tcpSocket      <- listeningTCP port
                                        let infoHash    = Hash $ fromJust $ findInfoHash be
                                        let trackerList = readTrackerList $ fromJust $ announceList be
                                        let fileList    = readFileList rootPath (getFiles (fromJust $ readFileDict be))
                                        let pieceLenList = pieceLengthList (getOverallSize fileList) (fromJust $ readPieceLength be)
                                        let pieceInfo   = setPieceInfo pieceLenList (fromJust $ pieceHashList be) fileList
-                                       return $ Just $ Stateless infoHash pieceInfo (Hash peerID) trackerList fileList
+                                       return $ Just $ Stateless infoHash pieceInfo (Hash peerID) trackerList fileList tcpSocket udpSocket

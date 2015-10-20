@@ -79,7 +79,9 @@ data Stateless = Stateless {
                              getPieceInfo :: PieceInfo,
                              getPeerId :: Hash,
                              getTrackers :: TrackerList,
-                             getFileList :: FileList
+                             getFileList :: FileList,
+                             getTCPSocket :: Socket,
+                             getUDPSocket :: Socket
                            }
 
 data Torrent = Torrent {

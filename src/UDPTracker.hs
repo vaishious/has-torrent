@@ -16,18 +16,10 @@ import Control.Monad
 import Control.Monad.Writer
 import Types
 
-makeSockAddr :: AnnounceURL -> Port -> IO SockAddr
-makeSockAddr trackerURL trackerPort = do trackerIP <- getHostByName trackerURL
-                                         return $ SockAddrInet (fromIntegral trackerPort) (hostAddress trackerIP)
-
-makeSocket :: IO Socket
-makeSocket = socket AF_INET Datagram 17
-
-sockConnTracker :: AnnounceURL -> Port -> IO Socket
-sockConnTracker trackerURL trackerPort = do trackerSock <- makeSockAddr trackerURL trackerPort
-                                            sockUDP <- makeSocket
-                                            connect sockUDP trackerSock
-                                            return sockUDP
+--TODO: Handle Exceptions?
+makeSockAddr :: Tracker -> IO SockAddr
+makeSockAddr (UDPTracker hostName port) = do trackerIP <- getHostByName hostName
+                                             return $ SockAddrInet (fromIntegral port) (hostAddress trackerIP)
 
 connectConnId :: Int64
 connectConnId = 4497486125440
