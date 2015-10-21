@@ -1,6 +1,7 @@
 module TypesHelp where
 import Types
 import Data.Int
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as V
 
 decodeEvent :: (Num a) => Event -> a
@@ -20,3 +21,6 @@ getPieceLeft (Piece _ blocks) = V.foldl (\a b -> if getDownloadStatus b then a e
 
 getLeft :: PieceList -> Int64
 getLeft = V.foldl (\a p -> a + fromIntegral (getPieceLeft p)) 0
+
+getPieceData :: Piece -> BL.ByteString
+getPieceData piece = BL.concat $ map getData $ V.toList $ getBlocks piece
