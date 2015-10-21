@@ -1,3 +1,4 @@
+module Communicate where
 import Types
 import Control.Monad.Writer
 import Control.Monad.State
@@ -49,11 +50,10 @@ convert = do message <- get
              else return Nothing
 
 byteStrToMsg :: BL.ByteString -> Maybe Message
-byteStrToMsg bs = fst $ runState convert bs
+byteStrToMsg = evalState convert
 
 msgToByteStr :: Message -> BL.ByteString
-msgToByteStr msg =  toLazyByteString $ execWriter $ do
-                        case msg of
+msgToByteStr msg =  toLazyByteString $ execWriter $ case msg of
                              KeepAliveMsg -> tell $ int32BE 0
                              ChokeMsg -> do tell $ int32BE 1
                                             tell $ int8 0
