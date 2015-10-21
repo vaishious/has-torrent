@@ -89,7 +89,7 @@ extractPeers :: BL.ByteString -> PeerList
 extractPeers peerRes = if BL.length peerRes < 6 then V.empty
                                                 else let (first,rest) = BL.splitAt 6 peerRes
                                                          (ip,port) = BL.splitAt 4 first
-                                                     in NoHandshake (decode ip :: Word32) (fromIntegral (decode port :: Word16)) `V.cons` extractPeers rest
+                                                     in NoHandshake (SockAddrInet (fromIntegral (decode port :: Word16)) (decode ip :: Word32)) `V.cons` extractPeers rest
 
 getPeers :: Tracker -> Stateless -> Torrent -> IO PeerList
 getPeers udpTracker constants stateful = do trackerAddr <- makeSockAddr udpTracker
