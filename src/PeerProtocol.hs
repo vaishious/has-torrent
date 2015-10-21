@@ -1,13 +1,21 @@
-import Network.Socket
+module PeerProtocol where
+import Types
+import Control.Monad.Writer
 import Data.ByteString.Builder
-import qualified Network.Socket.ByteString as NSB
-import qualified Data.ByteString.Char8 as C
 import Data.Int
-import Data.Byteable
-import Data.Monoid
 import Data.Word
-import qualified Data.ByteString.Lazy as LB
-import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
+import Network.Socket hiding (send, sendTo, recv, recvFrom)
+import Network.Socket.ByteString
+
+pStr :: String
+pStr = "BitTorrent protocol"
+
+pStrLen :: Int8
+pStrLen = 19
+
+reservedBytes :: BL.ByteString
+reservedBytes = BL.replicate 8 0
 
 -- remotePort and ipAddr are those of the peer
 makeTCPSock :: Socket -> Int -> Int -> IO Socket
@@ -17,7 +25,9 @@ makeTCPSock sockUDP remotePort ipAddr = do bindAddr <- getSocketName sockUDP
                                            connect sockTCP $ SockAddrInet (fromIntegral remotePort) $ fromIntegral ipAddr
                                            return sockTCP
 
-initHandshake :: Socket -> Int -> String -> C.ByteString -> C.ByteString -> IO Int
-initHandshake sockTCP pStrLen pStr infoHash peerId = do let init = mempty :: Builder
-                                                        let final = init `mappend` ((int8 . fromIntegral) pStrLen) `mappend` (string8 pStr) `mappend` (string8 "\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL") `mappend` (byteString infoHash) `mappend` (byteString peerId)
-                                                        NSB.send sockTCP $ LB.toStrict $ toLazyByteString final
+initHandshake :: Socket -> Stateless -> IO Int
+initHandshake sockTCP constants = send sockTCP $ BL.toStrict $ toLazyByteString $ execWriter $ do tell $ int8 pStrLen
+                                                                                                  tell $ string8 pStr
+                                                                                                  tell $ lazyByteString reservedBytes
+                                                                                                  tell $ lazyByteString $ getHash $ getInfoHash constants
+                                                                                                  tell $ lazyByteString $ getHash $ getPeerId constants
