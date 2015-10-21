@@ -6,6 +6,7 @@ import System.IO
 import Data.Word
 import Data.Time
 import Data.Set
+import Control.Applicative
 
 data File = File {
                    getFilePath :: FilePath,
@@ -62,6 +63,8 @@ data Peer = NoHandshake {
                           getPeerPort :: PortNumber
                         }
           | Handshake {
+                        getPeerHostAddress :: HostAddress,
+                        getPeerPort :: PortNumber,
                         getPeerState :: PeerState,
                         getSocket :: Socket,
                         getRequestTime :: UTCTime,
@@ -69,6 +72,9 @@ data Peer = NoHandshake {
                         getEffResponseTime :: UTCTime,
                         getRequestList :: [RequestId]
                       }
+instance Eq Peer where
+    p1 == p2 = (getPeerHostAddress p1 == getPeerHostAddress p2) && (getPeerPort p1 == getPeerPort p2)
+
 type PeerList = V.Vector Peer
 
 newtype RequestId = RequestId (Int,Int) deriving (Ord,Eq)
