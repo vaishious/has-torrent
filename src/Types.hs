@@ -59,12 +59,10 @@ data PeerState = PeerState {
                              getPeerInterested :: Bool
                            }
 data Peer = NoHandshake {
-                          getPeerHostAddress :: HostAddress,
-                          getPeerPort :: PortNumber
+                          getPeerAddress :: SockAddr
                         }
           | Handshake {
-                        getPeerHostAddress :: HostAddress,
-                        getPeerPort :: PortNumber,
+                        getPeerAddress :: SockAddr,
                         getPeerState :: PeerState,
                         getSocket :: Socket,
                         getRequestTime :: UTCTime,
@@ -73,7 +71,7 @@ data Peer = NoHandshake {
                         getRequestList :: [RequestId]
                       }
 instance Eq Peer where
-    p1 == p2 = (getPeerHostAddress p1 == getPeerHostAddress p2) && (getPeerPort p1 == getPeerPort p2)
+    p1 == p2 = getPeerAddress p1 == getPeerAddress p2
 
 type PeerList = V.Vector Peer
 
