@@ -39,15 +39,26 @@ initHandshake sockTCP constants = send sockTCP $ BL.toStrict $ toLazyByteString 
                                                                                                   tell $ lazyByteString $ getHash $ getInfoHash constants
                                                                                                   tell $ lazyByteString $ getHash $ getPeerId constants
 
-
 expectedHash :: Stateless -> Int -> BL.ByteString
 expectedHash constants index = getHash $ getPieceHash $ getPieceInfo constants V.! index
 
 computedHash :: Torrent -> Int -> BL.ByteString
 computedHash torrent index = BL.fromStrict $ toBytes $ hashlazy $ getPieceData $ getPieces torrent V.! index
 
+eraseBlockData :: Block -> Block
+eraseBlockData block = block{ getDownloadStatus = False, getData = BL.empty }
+
+erasePieceData :: Piece -> Piece
+erasePieceData piece = piece{ getBlocks = V.map eraseBlockData $ getBlocks piece }
+
+setVerifiedStatus :: Piece -> Piece
+setVerifiedStatus piece = piece{ getVerifiedStatus = True }
+
 verifyHashAndWrite :: Int -> Stateless -> StateT Torrent IO Bool
 verifyHashAndWrite index constants = StateT $ \torrent -> if computedHash torrent index == expectedHash constants index
                                                           then do forkIO $ writePiece index constants torrent
-                                                                  return (True,torrent)
-                                                          else return (False,torrent{ getPieceDownOrd = getPieceDownOrd torrent ++ [index] })
+                                                                  let pieces = (V.//) (getPieces torrent) [(index,setVerifiedStatus $ getPieces torrent V.! index)]
+                                                                  return (True,torrent{ getPieces = pieces })
+                                                          else do let pdo = getPieceDownOrd torrent
+                                                                  let pieces = (V.//) (getPieces torrent) [(index,erasePieceData $ getPieces torrent V.! index)]
+                                                                  return (False,torrent{ getPieceDownOrd = pdo ++ [index], getPieces = pieces })
