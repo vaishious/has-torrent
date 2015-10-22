@@ -1,3 +1,4 @@
+{-# LANGUAGE PackageImports #-}
 module File where
 import Types
 import TypesHelp
@@ -6,7 +7,6 @@ import System.Directory
 import System.Posix.IO
 import System.Posix.Fcntl
 import System.Posix.Files
--- Compile with -XPackageImports Flag
 import "unix-bytestring" System.Posix.IO.ByteString
 import System.Posix.Types
 import System.DiskSpace
