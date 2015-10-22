@@ -23,4 +23,4 @@ getLeft :: PieceList -> Int64
 getLeft = V.foldl (\a p -> a + fromIntegral (getPieceLeft p)) 0
 
 getPieceData :: Piece -> BL.ByteString
-getPieceData piece = BL.concat $ map getData $ V.toList $ getBlocks piece
+getPieceData = BL.concat . map getData . V.toList . getBlocks
