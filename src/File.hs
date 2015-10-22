@@ -36,13 +36,14 @@ createFileWithDir rootPath listPath fileSize = do createDirectoryIfMissing True 
 createAllFiles :: FilePath -> [([FilePath],Integer)] -> IO ()
 createAllFiles rootPath allFiles = forM_ allFiles $ uncurry (createFileWithDir rootPath)
 
-splitWrite :: BL.ByteString -> CoveredFile -> IO ByteCount
+splitWrite :: BL.ByteString -> CoveredFile -> IO ()
 splitWrite pieceData cFile = do fd <- openFd (getCoveredFilePath cFile) WriteOnly Nothing defaultFileFlags
                                 let off = fromIntegral $ getCoveredFileOffset cFile
                                 let len = fromIntegral $ getCoveredFileLength cFile
                                 let (_,right) = BL.splitAt off pieceData
                                 let (left,_)  = BL.splitAt (off + len) right
                                 fdPwrite fd (BL.toStrict left) (COff off)
+                                closeFd fd
 
 writePiece :: Int -> Stateless -> Torrent -> IO ()
 writePiece index constants torrent = mapM_ (splitWrite $ getPieceData $ getPieces torrent V.! index) (V.toList $ getCoveredFileList $ getPieceInfo constants V.! index)
