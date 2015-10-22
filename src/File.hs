@@ -34,7 +34,7 @@ createFileWithDir rootPath listPath fileSize = do createDirectoryIfMissing True 
                                                   createAllocFile (fullFoldPath rootPath listPath) fileSize
 
 createAllFiles :: FilePath -> [([FilePath],Integer)] -> IO ()
-createAllFiles rootPath allFiles = forM_ allFiles (\x -> createFileWithDir rootPath (fst x) (snd x))
+createAllFiles rootPath allFiles = forM_ allFiles $ uncurry (createFileWithDir rootPath)
 
 splitWrite :: BL.ByteString -> CoveredFile -> IO ByteCount
 splitWrite pieceData cFile = do fd <- openFd (getCoveredFilePath cFile) WriteOnly Nothing defaultFileFlags
