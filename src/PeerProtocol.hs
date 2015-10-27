@@ -14,6 +14,8 @@ import Data.Word
 import qualified Data.ByteString.Lazy as BL
 import Network.Socket hiding (send, sendTo, recv, recvFrom)
 import Network.Socket.ByteString.Lazy
+import System.Timeout
+import Control.Applicative
 
 pStr :: String
 pStr = "BitTorrent protocol"
@@ -33,11 +35,23 @@ makeTCPSock sockUDP remotePort ipAddr = do bindAddr <- getSocketName sockUDP
                                            return sockTCP
 
 initHandshake :: Socket -> Stateless -> IO Int
-initHandshake sockTCP constants = send sockTCP $ toLazyByteString $ execWriter $ do tell $ int8 pStrLen
+initHandshake sockTCP constants = fromIntegral <$> send sockTCP (toLazyByteString $ execWriter $ do
+                                                                                    tell $ int8 pStrLen
                                                                                     tell $ string8 pStr
                                                                                     tell $ lazyByteString reservedBytes
                                                                                     tell $ lazyByteString $ getHash $ getInfoHash constants
-                                                                                    tell $ lazyByteString $ getHash $ getPeerId constants
+                                                                                    tell $ lazyByteString $ getHash $ getPeerId constants)
+
+appendDataPeer :: Peer -> BL.ByteString -> Peer
+appendDataPeer (NoHandshakeSent sockaddr) _ = NoHandshakeSent sockaddr
+appendDataPeer peer recvd = if recvd == BL.empty then NoHandshakeSent $ getPeerAddress peer
+                                                 else peer{getUnparsed = BL.append (getUnparsed peer) recvd}
+
+recvDataPeer :: Peer -> IO Peer
+recvDataPeer (NoHandshakeSent sockaddr) = return $ NoHandshakeSent sockaddr
+recvDataPeer peer= do mayRecvd <- timeout 1000 $ recv (getSocket peer) (1024 * 128)
+                      case mayRecvd of Nothing -> return peer
+                                       (Just recvd) -> return $ appendDataPeer peer recvd
 
 expectedHash :: Stateless -> Int -> BL.ByteString
 expectedHash constants index = getHash $ getPieceHash $ getPieceInfo constants V.! index
