@@ -58,13 +58,19 @@ data PeerState = PeerState {
                              getPeerChoking :: Bool,
                              getPeerInterested :: Bool
                            }
-data Peer = NoHandshake {
-                          getPeerAddress :: SockAddr
-                        }
+data Peer = NoHandshakeSent {
+                              getPeerAddress :: SockAddr
+                            }
+          | NoHandshakeRecvd {
+                               getPeerAddress :: SockAddr,
+                               getSocket :: Socket,
+                               getUnparsed :: BL.ByteString
+                             }
           | Handshake {
                         getPeerAddress :: SockAddr,
                         getPeerState :: PeerState,
                         getSocket :: Socket,
+                        getUnparsed :: BL.ByteString,
                         getRequestTime :: UTCTime,
                         getResponseTime :: UTCTime,
                         getEffResponseTime :: UTCTime,
