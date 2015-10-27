@@ -13,7 +13,7 @@ import qualified Data.Vector as V
 import Data.Word
 import qualified Data.ByteString.Lazy as BL
 import Network.Socket hiding (send, sendTo, recv, recvFrom)
-import Network.Socket.ByteString
+import Network.Socket.ByteString.Lazy
 
 pStr :: String
 pStr = "BitTorrent protocol"
@@ -33,11 +33,11 @@ makeTCPSock sockUDP remotePort ipAddr = do bindAddr <- getSocketName sockUDP
                                            return sockTCP
 
 initHandshake :: Socket -> Stateless -> IO Int
-initHandshake sockTCP constants = send sockTCP $ BL.toStrict $ toLazyByteString $ execWriter $ do tell $ int8 pStrLen
-                                                                                                  tell $ string8 pStr
-                                                                                                  tell $ lazyByteString reservedBytes
-                                                                                                  tell $ lazyByteString $ getHash $ getInfoHash constants
-                                                                                                  tell $ lazyByteString $ getHash $ getPeerId constants
+initHandshake sockTCP constants = send sockTCP $ toLazyByteString $ execWriter $ do tell $ int8 pStrLen
+                                                                                    tell $ string8 pStr
+                                                                                    tell $ lazyByteString reservedBytes
+                                                                                    tell $ lazyByteString $ getHash $ getInfoHash constants
+                                                                                    tell $ lazyByteString $ getHash $ getPeerId constants
 
 expectedHash :: Stateless -> Int -> BL.ByteString
 expectedHash constants index = getHash $ getPieceHash $ getPieceInfo constants V.! index
