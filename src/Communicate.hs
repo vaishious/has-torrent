@@ -4,6 +4,7 @@ import Control.Monad.Writer
 import Control.Monad.State
 import qualified Data.ByteString.Lazy as BL
 import Data.ByteString.Builder
+import Data.Maybe (fromJust,isNothing)
 import Data.Word
 import qualified Data.Binary as BY
 
@@ -17,6 +18,9 @@ readFourBytes = state $ \bs -> let (left,right) = BL.splitAt 4 bs
                                    word32 = BY.decode left :: Word32
                                in (fromIntegral word32,right)
 
+statefulSplit :: Int -> State BL.ByteString BL.ByteString
+statefulSplit index = state $ \bs -> BL.splitAt (fromIntegral index) bs
+
 convert :: State BL.ByteString (Maybe Message)
 convert = do message <- get
              if BL.length message > 3
@@ -24,8 +28,8 @@ convert = do message <- get
                      case len of
                           0 -> return $ Just KeepAliveMsg
                           _ -> do message <- get
-                                  case len == fromIntegral (BL.length message) of
-                                       True -> do id <- readOneByte
+                                  if len >= fromIntegral (BL.length message) then
+                                               do id <- readOneByte
                                                   case id of
                                                        0 -> return $ Just ChokeMsg
                                                        1 -> return $ Just UnchokeMsg
@@ -39,18 +43,24 @@ convert = do message <- get
                                                                return $ Just $ RequestMsg index begin length
                                                        7 -> do index <- readFourBytes
                                                                begin <- readFourBytes
-                                                               block <- get
+                                                               block <- statefulSplit (len - 9)
                                                                return $ Just $ PieceMsg index begin (fromIntegral $ BL.length block) block
                                                        8 -> do index  <- readFourBytes
                                                                begin  <- readFourBytes
                                                                length <- readFourBytes
                                                                return $ Just $ CancelMsg index begin length
                                                        _ -> return Nothing
-                                       _ -> return Nothing
+                                  else return Nothing
              else return Nothing
 
-byteStrToMsg :: BL.ByteString -> Maybe Message
-byteStrToMsg = evalState convert
+parseMessages :: State BL.ByteString [Message]
+parseMessages = do bs <- get
+                   let (maybeMsg,bs') = runState convert bs
+                   if isNothing maybeMsg
+                   then return []
+                   else do put bs'
+                           xs <- parseMessages
+                           return (fromJust maybeMsg:xs)
 
 msgToByteStr :: Message -> BL.ByteString
 msgToByteStr msg =  toLazyByteString $ execWriter $ case msg of
