@@ -6,7 +6,6 @@ import System.IO
 import Data.Word
 import Data.Time
 import Data.Set
-import Control.Applicative
 
 data File = File {
                    getFilePath :: FilePath,
@@ -81,7 +80,7 @@ instance Eq Peer where
 
 type PeerList = V.Vector Peer
 
-newtype RequestId = RequestId (Int,Int) deriving (Ord,Eq)
+newtype RequestId = RequestId (Int,Int) deriving (Ord,Eq) -- (PieceIndex, BlockIndex)
 data Event = None | Started | Stopped | Completed deriving (Eq)
 
 data Stateless = Stateless {

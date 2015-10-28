@@ -24,3 +24,9 @@ getLeft = V.foldl (\a p -> a + fromIntegral (getPieceLeft p)) 0
 
 getPieceData :: Piece -> BL.ByteString
 getPieceData = BL.concat . map getData . V.toList . getBlocks
+
+minBlocksRequest :: Integral a => a
+minBlocksRequest = 100
+
+requestIdToBlock :: RequestId -> PieceList -> Block
+requestIdToBlock (RequestId (pieceId,blockId)) = (V.!blockId) . getBlocks . (V.!pieceId)
