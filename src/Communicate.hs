@@ -28,7 +28,7 @@ convert = do message <- get
                      case len of
                           0 -> return $ Just KeepAliveMsg
                           _ -> do message <- get
-                                  if len >= fromIntegral (BL.length message) then
+                                  if len <= fromIntegral (BL.length message) then
                                                do id <- readOneByte
                                                   case id of
                                                        0 -> return $ Just ChokeMsg
