@@ -10,6 +10,7 @@ import Data.Int
 import Data.Word
 import Data.Monoid
 import Data.Maybe
+import qualified Data.List.Zipper as Z
 import qualified Data.Vector as V
 import System.Timeout
 import System.Random
@@ -74,7 +75,7 @@ sendAnnounceReq connId trackerAddr constants timeWaitSec stateful = do transIdRe
                                                                             tell $ int16BE $ fromIntegral port) trackerAddr
                                                                        maybeResponse <- timeout (timeWaitSec*100000) $ recv (getUDPSocket constants) 320
                                                                        case liftM BL.fromStrict maybeResponse >>= validAnnounceRes transIdReq of
-                                                                            Nothing -> return V.empty
+                                                                            Nothing -> return Z.empty
                                                                             Just peerRes -> return $ extractPeers peerRes
 
 validAnnounceRes :: Int32 -> BL.ByteString -> Maybe BL.ByteString
@@ -86,14 +87,14 @@ validAnnounceRes transIdReq response = do guard $ BL.length response >=20
                                           return $ BL.drop 12 details
 
 extractPeers :: BL.ByteString -> PeerList
-extractPeers peerRes = if BL.length peerRes < 6 then V.empty
+extractPeers peerRes = if BL.length peerRes < 6 then Z.empty
                                                 else let (first,rest) = BL.splitAt 6 peerRes
                                                          (ip,port) = BL.splitAt 4 first
-                                                     in NoHandshakeSent (SockAddrInet (fromIntegral (decode port :: Word16)) (decode ip :: Word32)) `V.cons` extractPeers rest
+                                                     in NoHandshakeSent (SockAddrInet (fromIntegral (decode port :: Word16)) (decode ip :: Word32)) `Z.insert` extractPeers rest
 
 getPeers :: Tracker -> Stateless -> Torrent -> IO PeerList
 getPeers udpTracker constants stateful = do trackerAddr <- makeSockAddr udpTracker
                                             -- Tracker timeout for each connect set to 30 seconds. Change?
                                             maybeConnect <- sendConnectReq (getUDPSocket constants) trackerAddr 30
-                                            case maybeConnect of Nothing -> return V.empty
+                                            case maybeConnect of Nothing -> return Z.empty
                                                                  Just connId -> sendAnnounceReq connId trackerAddr constants 30 stateful

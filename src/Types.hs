@@ -6,6 +6,7 @@ import System.IO
 import Data.Word
 import Data.Time
 import Data.Set
+import qualified Data.List.Zipper as Z
 
 data File = File {
                    getFilePath :: FilePath,
@@ -78,7 +79,7 @@ data Peer = NoHandshakeSent {
 instance Eq Peer where
     p1 == p2 = getPeerAddress p1 == getPeerAddress p2
 
-type PeerList = V.Vector Peer
+type PeerList = Z.Zipper Peer
 
 newtype RequestId = RequestId (Int,Int) deriving (Ord,Eq) -- (PieceIndex, BlockIndex)
 data Event = None | Started | Stopped | Completed deriving (Eq)

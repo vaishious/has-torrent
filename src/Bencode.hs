@@ -19,6 +19,7 @@ import System.Random
 import Data.Word
 import qualified Data.Set as S
 import System.Random.Shuffle (shuffleM)
+import qualified Data.List.Zipper as Z
 
 lenHash :: Int
 lenHash = 20
@@ -185,4 +186,4 @@ setPieceList = V.map setPiece
 setStateful :: Stateless -> IO Torrent
 setStateful constants = do let pieces = setPieceList $ getPieceInfo constants
                            pieceOrd <- randomPerm $ V.length pieces
-                           return $ Torrent Started pieces pieceOrd S.empty Nothing V.empty V.empty
+                           return $ Torrent Started pieces pieceOrd S.empty Nothing Z.empty Z.empty
