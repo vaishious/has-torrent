@@ -3,6 +3,7 @@ import Types
 import Data.Int
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Vector as V
+import qualified Data.Set as S
 
 decodeEvent :: (Num a) => Event -> a
 decodeEvent None = 0
@@ -25,8 +26,11 @@ getLeft = V.foldl (\a p -> a + fromIntegral (getPieceLeft p)) 0
 getPieceData :: Piece -> BL.ByteString
 getPieceData = BL.concat . map getData . V.toList . getBlocks
 
-minBlocksRequest :: Integral a => a
-minBlocksRequest = 100
+minActiveBlocks :: Integral a => a
+minActiveBlocks = 100
 
 requestIdToBlock :: RequestId -> PieceList -> Block
 requestIdToBlock (RequestId (pieceId,blockId)) = (V.!blockId) . getBlocks . (V.!pieceId)
+
+pieceToReqs :: Int -> PieceList -> S.Set RequestId
+pieceToReqs index pieces = S.fromList $ map RequestId $ zip (repeat index) [0..(V.length pieces -1)]

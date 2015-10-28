@@ -12,6 +12,7 @@ import Data.Int
 import qualified Data.Vector as V
 import Data.Word
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.Set as S
 import Network.Socket hiding (send, sendTo, recv, recvFrom)
 import Network.Socket.ByteString.Lazy
 import System.Timeout
@@ -76,3 +77,13 @@ verifyHashAndWrite index constants = StateT $ \torrent -> if computedHash torren
                                                           else do let pdo = getPieceDownOrd torrent
                                                                   let pieces = (V.//) (getPieces torrent) [(index,erasePieceData $ getPieces torrent V.! index)]
                                                                   return (False,torrent{ getPieceDownOrd = pdo ++ [index], getPieces = pieces })
+
+checkAndAddPieces :: StateT Torrent IO ()
+checkAndAddPieces = do torrent <- get
+                       let numActiveBlocks = S.size $ getActiveBlocks torrent
+                       let pieceOrd = getPieceDownOrd torrent
+                       unless (numActiveBlocks >= minActiveBlocks || null pieceOrd) $ do
+                            let x:xs = pieceOrd
+                            let newBlocks = pieceToReqs x $ getPieces torrent
+                            put torrent{getPieceDownOrd = xs, getActiveBlocks = S.union (getActiveBlocks torrent) newBlocks}
+                            checkAndAddPieces
