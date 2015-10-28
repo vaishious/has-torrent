@@ -142,7 +142,7 @@ genPeerID = do let randomWord8 = getStdRandom random :: IO Word8
                return $ BL.pack word8List
 
 makeUDPSock :: IO Socket
-makeUDPSock = do sock <- socket AF_INET Datagram 17
+makeUDPSock = do sock <- socket AF_INET Datagram defaultProtocol
                  bind sock (SockAddrInet aNY_PORT iNADDR_ANY)
                  return sock
 
