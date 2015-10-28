@@ -1,6 +1,6 @@
 module Bencode where
 import Data.BEncode
-import qualified Data.ByteString.Lazy as B
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.Map as M
 import Crypto.Hash.SHA1
 import Data.Int
@@ -17,16 +17,18 @@ import File
 import Control.Monad (replicateM)
 import System.Random
 import Data.Word
+import qualified Data.Set as S
+import System.Random.Shuffle (shuffleM)
 
 lenHash :: Int
 lenHash = 20
 
 readAndDecode :: FilePath -> IO (Maybe BEncode)
-readAndDecode fp = do bs <- B.readFile fp
+readAndDecode fp = do bs <- BL.readFile fp
                       return $ bRead bs
 
-findInfoHash :: Maybe BEncode -> Maybe B.ByteString
-findInfoHash (Just (BDict be)) = Just $ B.fromStrict $ toBytes $ hashlazy $ bPack infoDict
+findInfoHash :: Maybe BEncode -> Maybe BL.ByteString
+findInfoHash (Just (BDict be)) = Just $ BL.fromStrict $ toBytes $ hashlazy $ bPack infoDict
                            where Just infoDict = M.lookup "info" be
 findInfoHash _ = Nothing
 
@@ -49,13 +51,13 @@ successiveLookup [] be = be
 successiveLookup (x:xs) (Just (BDict bd)) = successiveLookup xs (M.lookup x bd)
 successiveLookup _ _ = Nothing
 
-splitPieceHash :: B.ByteString -> [B.ByteString]
-splitPieceHash piecehash = case B.length piecehash > 0 of
+splitPieceHash :: BL.ByteString -> [BL.ByteString]
+splitPieceHash piecehash = case BL.length piecehash > 0 of
                                True -> head : splitPieceHash piecehash'
-                                    where (head,piecehash') = B.splitAt (fromIntegral lenHash) piecehash
+                                    where (head,piecehash') = BL.splitAt (fromIntegral lenHash) piecehash
                                _    -> []
 
-pieceHashList :: Maybe BEncode -> Maybe [B.ByteString]
+pieceHashList :: Maybe BEncode -> Maybe [BL.ByteString]
 pieceHashList be = case successiveLookup ["info","pieces"] be of
                         (Just (BString bs)) -> Just $ splitPieceHash bs
                         _                   -> Nothing
@@ -72,7 +74,7 @@ pieceLengthList :: Integer -> Integer -> [Int]
 pieceLengthList totalSize pieceLength = replicate (fromIntegral $ quot totalSize pieceLength) (fromIntegral pieceLength) ++ last
                                       where last = if mod totalSize pieceLength == 0 then [] else [fromIntegral $ mod totalSize pieceLength]
 
-setPieceInfo :: [Int] -> [B.ByteString] -> FileList -> PieceInfo
+setPieceInfo :: [Int] -> [BL.ByteString] -> FileList -> PieceInfo
 setPieceInfo lenList hashList fileList = V.fromList $ zipWith3 SinglePieceInfo lenList (map Hash hashList) (coveredFileList fileList (map fromIntegral lenList))
 
 -- What if input is not of the type (BList a)?
@@ -133,10 +135,10 @@ toFile rootPath (listPath,size) = File (fullFoldPath rootPath listPath) size
 readFileList :: FilePath -> [([FilePath],Integer)] -> FileList
 readFileList rootPath files = V.fromList $ map (toFile rootPath) files
 
-genPeerID :: IO B.ByteString
+genPeerID :: IO BL.ByteString
 genPeerID = do let randomWord8 = getStdRandom random :: IO Word8
                word8List <- replicateM lenHash randomWord8
-               return $ B.pack word8List
+               return $ BL.pack word8List
 
 makeUDPSock :: IO Socket
 makeUDPSock = do sock <- socket AF_INET Datagram 17
@@ -161,3 +163,26 @@ setStateless torrentFile rootPath = do be             <- readAndDecode torrentFi
                                        let pieceLenList = pieceLengthList (getOverallSize fileList) (fromJust $ readPieceLength be)
                                        let pieceInfo   = setPieceInfo pieceLenList (fromJust $ pieceHashList be) fileList
                                        return $ Just $ Stateless infoHash pieceInfo (Hash peerID) trackerList fileList tcpSocket udpSocket
+
+randomPerm :: (Integral a) => a -> IO [a]
+randomPerm numPieces = shuffleM [0..(numPieces-1)]
+
+-- 16 KB blocks
+blockLength :: (Integral a) => a
+blockLength = 16384
+
+setBlocks :: Int -> Int -> [Block]
+setBlocks pieceLength pieceOffset = if pieceLength > blockLength
+                                    then Block False BL.empty pieceOffset blockLength:setBlocks (pieceLength - blockLength) (pieceOffset+blockLength)
+                                    else [Block False BL.empty pieceOffset pieceLength]
+
+setPiece :: SinglePieceInfo -> Piece
+setPiece SinglePieceInfo { getPieceLength = pieceLen } = Piece False $ V.fromList (setBlocks pieceLen 0)
+
+setPieceList :: PieceInfo -> PieceList
+setPieceList = V.map setPiece
+
+setStateful :: Stateless -> IO Torrent
+setStateful constants = do let pieces = setPieceList $ getPieceInfo constants
+                           pieceOrd <- randomPerm $ V.length pieces
+                           return $ Torrent Started pieces pieceOrd S.empty Nothing V.empty V.empty
