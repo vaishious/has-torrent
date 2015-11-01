@@ -129,13 +129,6 @@ coveredFileList fileList pieceLengthList = map g $ allSplit filePositionList $ p
                                                f (a,b,c)          = CoveredFile (getFilePath $ (V.!) fileList (fromIntegral a)) b (fromIntegral c)
                                                g a                = V.fromList $ map f a
 
---TODO: Relocate code.
-toFile :: FilePath -> ([FilePath],Integer) -> File
-toFile rootPath (listPath,size) = File (fullFoldPath rootPath listPath) size
-
-readFileList :: FilePath -> [([FilePath],Integer)] -> FileList
-readFileList rootPath files = V.fromList $ map (toFile rootPath) files
-
 genPeerID :: IO BL.ByteString
 genPeerID = do let randomWord8 = getStdRandom random :: IO Word8
                word8List <- replicateM lenHash randomWord8
@@ -158,9 +151,9 @@ setStateless torrentFile rootPath = do be             <- readAndDecode torrentFi
                                        udpSocket      <- makeUDPSock
                                        port           <- socketPort udpSocket
                                        tcpSocket      <- listeningTCP port
+                                       fileList       <- createAllFiles rootPath (getFiles (fromJust $ readFileDict be))
                                        let infoHash    = Hash $ fromJust $ findInfoHash be
                                        let trackerList = readTrackerList $ fromJust $ announceList be
-                                       let fileList    = readFileList rootPath (getFiles (fromJust $ readFileDict be))
                                        let pieceLenList = pieceLengthList (getOverallSize fileList) (fromJust $ readPieceLength be)
                                        let pieceInfo   = setPieceInfo pieceLenList (fromJust $ pieceHashList be) fileList
                                        return $ Just $ Stateless infoHash pieceInfo (Hash peerID) trackerList fileList tcpSocket udpSocket

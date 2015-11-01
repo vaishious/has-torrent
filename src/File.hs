@@ -1,5 +1,9 @@
 {-# LANGUAGE PackageImports #-}
-module File where
+module File (
+                spaceAvailable,
+                createAllFiles,
+                writePiece
+            ) where
 import Types
 import TypesHelp
 import System.IO
@@ -17,24 +21,39 @@ import qualified Data.Vector as V
 import Control.Monad
 import qualified Data.ByteString.Lazy as BL
 
--- Gives us how much space is available in the current working directory. Directory must be set to the user download directory
+-- Gives us how much space is available in the current working directory
 spaceAvailable :: IO Integer
 spaceAvailable = getAvailSpace "./"
 
+-- Get relative paths of files from the recursive structure specified in the .torrent file
 fullFoldPath :: FilePath -> [FilePath] -> FilePath
 fullFoldPath rootPath listPath = ("./"++) $ foldl (\pref suff -> pref ++ "/" ++ suff) rootPath listPath
 
-createAllocFile :: FilePath -> Integer -> IO ()
-createAllocFile filePath fileSize = do fileFd <- openFd filePath WriteOnly (Just stdFileMode) defaultFileFlags
-                                       fileAllocate fileFd 0 (fromIntegral fileSize)
-                                       closeFd fileFd
+-- Create and allocate the entire space for the file
+-- Make sure all parent directories are created before calling
+createAllocFile :: File -> IO ()
+createAllocFile (File filePath fileSize) = do fileFd <- openFd filePath WriteOnly (Just stdFileMode) defaultFileFlags
+                                              fileAllocate fileFd 0 (fromIntegral fileSize)
+                                              closeFd fileFd
 
+-- Given the file in recursive .torrent format create all it's parent directories and the file itself
 createFileWithDir :: FilePath -> [FilePath] -> Integer -> IO ()
 createFileWithDir rootPath listPath fileSize = do createDirectoryIfMissing True $ fullFoldPath rootPath $ init listPath
-                                                  createAllocFile (fullFoldPath rootPath listPath) fileSize
+                                                  createAllocFile $ File (fullFoldPath rootPath listPath) fileSize
 
-createAllFiles :: FilePath -> [([FilePath],Integer)] -> IO ()
-createAllFiles rootPath allFiles = forM_ allFiles $ uncurry (createFileWithDir rootPath)
+-- Convert the recursive file from the torrent file to a better data type
+toFile :: FilePath -> ([FilePath],Integer) -> File
+toFile rootPath (listPath,size) = File (fullFoldPath rootPath listPath) size
+
+-- Convert all files to a better FileList data type format
+readFileList :: FilePath -> [([FilePath],Integer)] -> FileList
+readFileList rootPath files = V.fromList $ map (toFile rootPath) files
+
+-- Given all file recursive structures, create all the files, necessary directory structure and return a in formatted FileList data type
+createAllFiles :: FilePath -> [([FilePath],Integer)] -> IO FileList
+createAllFiles rootPath allFiles = do forM_ allFiles $ uncurry (createFileWithDir rootPath)
+                                      return $ readFileList rootPath allFiles
+
 
 splitWrite :: BL.ByteString -> [CoveredFile] -> IO ()
 splitWrite pieceData (CoveredFile fpath off len:xs) = do fd <- openFd fpath WriteOnly Nothing defaultFileFlags

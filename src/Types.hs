@@ -11,7 +11,7 @@ import qualified Data.List.Zipper as Z
 data File = File {
                    getFilePath :: FilePath,
                    getSize :: Integer
-                 }
+                 } deriving Show
 type FileList = V.Vector File
 
 newtype Hash = Hash {getHash :: BL.ByteString}
