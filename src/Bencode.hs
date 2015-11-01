@@ -43,9 +43,15 @@ getFiles (BList (BDict map:xs)) = (pathlist,len) : getFiles (BList xs)
                                       pathlist            = decodePath list
 getFiles _                      = []
 
+extractString :: BEncode -> String
+extractString (BString str) = LC.unpack str
+extractString _ = ""
+
+getRootPath :: Maybe BEncode -> FilePath
+getRootPath = extractString . fromJust . successiveLookup ["info","name"]
+
 decodePath :: [BEncode] -> [FilePath]
-decodePath [] = []
-decodePath (BString x:xs) = LC.unpack x : decodePath xs
+decodePath = map extractString
 
 successiveLookup :: [String] -> Maybe BEncode -> Maybe BEncode
 successiveLookup [] be = be
@@ -145,18 +151,19 @@ listeningTCP udpPort = do sock <- socket AF_INET Stream defaultProtocol
                           listen sock 2
                           return sock
 
-setStateless :: FilePath -> FilePath -> IO (Maybe Stateless)
-setStateless torrentFile rootPath = do be             <- readAndDecode torrentFile
-                                       peerID         <- genPeerID
-                                       udpSocket      <- makeUDPSock
-                                       port           <- socketPort udpSocket
-                                       tcpSocket      <- listeningTCP port
-                                       fileList       <- createAllFiles rootPath (getFiles (fromJust $ readFileDict be))
-                                       let infoHash    = Hash $ fromJust $ findInfoHash be
-                                       let trackerList = readTrackerList $ fromJust $ announceList be
-                                       let pieceLenList = pieceLengthList (getOverallSize fileList) (fromJust $ readPieceLength be)
-                                       let pieceInfo   = setPieceInfo pieceLenList (fromJust $ pieceHashList be) fileList
-                                       return $ Just $ Stateless infoHash pieceInfo (Hash peerID) trackerList fileList tcpSocket udpSocket
+setStateless :: FilePath -> IO (Maybe Stateless)
+setStateless torrentFile = do be             <- readAndDecode torrentFile
+                              peerID         <- genPeerID
+                              udpSocket      <- makeUDPSock
+                              port           <- socketPort udpSocket
+                              tcpSocket      <- listeningTCP port
+                              let rootPath    = getRootPath be
+                              fileList       <- createAllFiles rootPath (getFiles (fromJust $ readFileDict be))
+                              let infoHash    = Hash $ fromJust $ findInfoHash be
+                              let trackerList = readTrackerList $ fromJust $ announceList be
+                              let pieceLenList = pieceLengthList (getOverallSize fileList) (fromJust $ readPieceLength be)
+                              let pieceInfo   = setPieceInfo pieceLenList (fromJust $ pieceHashList be) fileList
+                              return $ Just $ Stateless infoHash pieceInfo (Hash peerID) trackerList fileList tcpSocket udpSocket
 
 randomPerm :: (Integral a) => a -> IO [a]
 randomPerm numPieces = shuffleM [0..(numPieces-1)]
