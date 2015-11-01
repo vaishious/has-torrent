@@ -43,16 +43,17 @@ initHandshake sockTCP constants = fromIntegral <$> send sockTCP (toLazyByteStrin
                                                                                     tell $ lazyByteString $ getHash $ getInfoHash constants
                                                                                     tell $ lazyByteString $ getHash $ getPeerId constants)
 
-appendDataPeer :: Peer -> BL.ByteString -> Peer
-appendDataPeer (NoHandshakeSent sockaddr) _ = NoHandshakeSent sockaddr
-appendDataPeer peer recvd = if recvd == BL.empty then NoHandshakeSent $ getPeerAddress peer
-                                                 else peer{getUnparsed = BL.append (getUnparsed peer) recvd}
+appendDataPeer :: Peer -> BL.ByteString -> IO Peer
+appendDataPeer (NoHandshakeSent sockaddr) _ = return $ NoHandshakeSent sockaddr
+appendDataPeer peer recvd = if recvd == BL.empty then do close $ getSocket peer
+                                                         return $ NoHandshakeSent $ getPeerAddress peer
+                                                 else return $ peer{getUnparsed = BL.append (getUnparsed peer) recvd}
 
 recvDataPeer :: Peer -> IO Peer
 recvDataPeer (NoHandshakeSent sockaddr) = return $ NoHandshakeSent sockaddr
 recvDataPeer peer= do mayRecvd <- timeout 1000 $ recv (getSocket peer) (1024 * 128)
                       case mayRecvd of Nothing -> return peer
-                                       (Just recvd) -> return $ appendDataPeer peer recvd
+                                       (Just recvd) -> appendDataPeer peer recvd
 
 expectedHash :: Stateless -> Int -> BL.ByteString
 expectedHash constants index = getHash $ getPieceHash $ getPieceInfo constants V.! index
