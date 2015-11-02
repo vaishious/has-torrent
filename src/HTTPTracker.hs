@@ -48,7 +48,7 @@ eventToString e = case decodeEvent e of 1 -> "completed"
                                         3 -> "stopped"
                                         _ -> "started"
 
-checkResult :: Maybe URL -> IO (Maybe String)                                        
+checkResult :: Maybe URL -> IO (Maybe String)
 checkResult url = case url of
         Just u -> checkResponse u
         Nothing -> return Nothing
