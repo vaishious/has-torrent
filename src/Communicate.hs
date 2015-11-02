@@ -62,11 +62,11 @@ parseMessages = do bs <- get
                            xs <- parseMessages
                            return (fromJust maybeMsg:xs)
 
-peerMessages :: State Peer [Message]
+peerMessages :: State Peer ()
 peerMessages = do peer@Handshake{ getUnparsed = bs, getPendingMessages = pMsgs } <- get
                   let (msgList,bs') = runState parseMessages bs
                   put peer{ getUnparsed = bs', getPendingMessages = pMsgs++msgList}
-                  return msgList
+                  return ()
 
 msgToByteStr :: Message -> BL.ByteString
 msgToByteStr msg = toLazyByteString $ execWriter $ case msg of
