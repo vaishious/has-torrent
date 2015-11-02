@@ -6,8 +6,7 @@ import Network.URL
 import Network.HTTP
 import Control.Applicative
 import Control.Monad
-import qualified Data.ByteString.Lazy as BL
-import qualified Language.Haskell.TH.Ppr as L
+import qualified Data.ByteString.Lazy.Char8 as LC
 
 addParam :: Maybe URL -> (String,String) -> Maybe URL
 addParam url (key,val) = case url of
@@ -24,10 +23,10 @@ getParam port up dw left event com num
         | com == 0 = [("port",show port),("uploaded",show up),("downloaded",show dw),("left",show left),("event",event),("numwant",show num)]
         | otherwise = [("port",show port),("uploaded",show up),("downloaded",show dw),("left",show left),("event",event),("compact","1"),("numwant",show num)]
 
-getUrl :: String -> BL.ByteString -> BL.ByteString -> String
-getUrl tracker infoHashEsc peerIdEsc = tracker ++ "?" ++ L.bytesToString (BL.unpack infoHashEsc) ++ "&" ++ L.bytesToString (BL.unpack peerIdEsc)
+getUrl :: String -> LC.ByteString -> LC.ByteString -> String
+getUrl tracker infoHashEsc peerIdEsc = tracker ++ "?" ++ LC.unpack infoHashEsc ++ "&" ++ LC.unpack peerIdEsc
 
-requestUrl :: String -> BL.ByteString -> BL.ByteString -> Integer -> Integer -> Integer -> Integer -> String -> Integer -> Integer -> Maybe URL
+requestUrl :: String -> LC.ByteString -> LC.ByteString -> Integer -> Integer -> Integer -> Integer -> String -> Integer -> Integer -> Maybe URL
 requestUrl tr infoHashEsc peerIdEsc port up dw left event com num = z where
         tracker = getUrl tr infoHashEsc peerIdEsc
         param = getParam port up dw left event com num
