@@ -71,6 +71,7 @@ data Peer = NoHandshakeSent {
                         getPeerState :: PeerState,
                         getSocket :: Socket,
                         getUnparsed :: BL.ByteString,
+                        getPendingMessages :: [Message],
                         getRequestTime :: UTCTime,
                         getResponseTime :: UTCTime,
                         getEffResponseTime :: UTCTime,
