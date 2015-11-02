@@ -35,4 +35,4 @@ minActiveBlocks :: Integral a => a
 minActiveBlocks = 100
 
 pieceToReqs :: Int -> PieceList -> S.Set RequestId
-pieceToReqs index pieces = S.fromList $ map RequestId $ zip (repeat index) [0..(V.length pieces -1)]
+pieceToReqs index pieces = S.fromList $ map RequestId $ zip (repeat index) $ fst . unzip . M.toList . getBlocks $ pieces V.! index
