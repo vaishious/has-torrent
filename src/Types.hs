@@ -11,22 +11,22 @@ import qualified Data.List.Zipper as Z
 data File = File {
                    getFilePath :: FilePath,
                    getSize :: Integer
-                 }
+                 } deriving (Show)
 type FileList = V.Vector File
 
-newtype Hash = Hash {getHash :: BL.ByteString}
+newtype Hash = Hash {getHash :: BL.ByteString} deriving (Show)
 
 data CoveredFile = CoveredFile {
                                  getCoveredFilePath :: FilePath,
                                  getCoveredFileOffset :: Integer,
                                  getCoveredFileLength :: Int
-                               }
+                               } deriving (Show)
 type CoveredFileList = V.Vector CoveredFile
 data SinglePieceInfo = SinglePieceInfo {
                                          getPieceLength :: Int,
                                          getPieceHash :: Hash,
                                          getCoveredFileList :: CoveredFileList
-                                       }
+                                       } deriving (Show)
 type PieceInfo = V.Vector SinglePieceInfo
 
 -- Temporarily modified UDPHostName to String type
@@ -36,7 +36,7 @@ data Tracker = UDPTracker {
                           }
              | HTTPTracker {
                              getURL :: String
-                           }
+                           } deriving (Show)
 type TrackerList = [Tracker]
 
 data Block = Block {
@@ -44,12 +44,12 @@ data Block = Block {
                      getData :: BL.ByteString,
                      getOffset :: Int,
                      getLength :: Int
-                   }
+                   } deriving (Show)
 
 data Piece = Piece {
                      getVerifiedStatus :: Bool,
                      getBlocks :: V.Vector Block
-                   }
+                   } deriving (Show)
 type PieceList = V.Vector Piece
 
 data PeerState = PeerState {
@@ -57,7 +57,7 @@ data PeerState = PeerState {
                              getAmInterested :: Bool,
                              getPeerChoking :: Bool,
                              getPeerInterested :: Bool
-                           }
+                           } deriving (Show)
 data Peer = NoHandshakeSent {
                               getPeerAddress :: SockAddr
                             }
@@ -75,14 +75,15 @@ data Peer = NoHandshakeSent {
                         getResponseTime :: UTCTime,
                         getEffResponseTime :: UTCTime,
                         getRequestList :: [RequestId]
-                      }
+                      } deriving (Show)
+
 instance Eq Peer where
     p1 == p2 = getPeerAddress p1 == getPeerAddress p2
 
 type PeerList = Z.Zipper Peer
 
-newtype RequestId = RequestId (Int,Int) deriving (Ord,Eq) -- (PieceIndex, BlockIndex)
-data Event = None | Started | Stopped | Completed deriving (Eq)
+newtype RequestId = RequestId (Int,Int) deriving (Ord,Eq,Show) -- (PieceIndex, BlockIndex)
+data Event = None | Started | Stopped | Completed deriving (Eq,Show)
 
 data Stateless = Stateless {
                              getInfoHash :: Hash,
@@ -92,7 +93,7 @@ data Stateless = Stateless {
                              getFileList :: FileList,
                              getTCPSocket :: Socket,
                              getUDPSocket :: Socket
-                           }
+                           } deriving (Show)
 
 data Torrent = Torrent {
                          getEvent :: Event,
@@ -102,7 +103,7 @@ data Torrent = Torrent {
                          getActiveTracker :: Maybe Tracker,
                          getActivePeers :: PeerList,
                          getInactivePeers :: PeerList
-                       }
+                       } deriving (Show)
 
 data Message = KeepAliveMsg
              | ChokeMsg
@@ -127,4 +128,4 @@ data Message = KeepAliveMsg
                            getPieceIndex :: Int,
                            getBlockBegin :: Int,
                            getBlockLength :: Int
-                         }
+                         } deriving (Show)
