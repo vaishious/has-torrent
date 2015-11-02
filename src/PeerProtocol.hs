@@ -134,7 +134,9 @@ processedActiveMessages constants = do torrent <- get
                                        else do let (msg:rest) = messages
                                                time <- lift getCurrentTime
                                                let peer = peer {getPendingMessages = rest, getResponseTime = time}
-                                               case msg of ChokeMsg -> do let peer = peer {getEffResponseTime = time}
+                                               case msg of ChokeMsg -> do let peer = peer {getEffResponseTime = time,
+                                                                                           getPeerState = (getPeerState peer){getPeerChoking=True},
+                                                                                           getRequestList = []}
                                                                           put torrent {getActivePeers = Z.delete $ getActivePeers torrent,
                                                                                        getInactivePeers = Z.push peer $ getInactivePeers torrent}
                                                                           return False
