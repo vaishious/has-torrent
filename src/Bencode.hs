@@ -1,4 +1,5 @@
 module Bencode where
+import TypesHelp
 import Data.BEncode
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Map as M
@@ -168,17 +169,13 @@ setStateless torrentFile = do be             <- readAndDecode torrentFile
 randomPerm :: (Integral a) => a -> IO [a]
 randomPerm numPieces = shuffleM [0..(numPieces-1)]
 
--- 16 KB blocks
-blockLength :: (Integral a) => a
-blockLength = 16384
-
-setBlocks :: Int -> Int -> [Block]
+setBlocks :: Int -> Int -> [(Int,Block)]
 setBlocks pieceLength pieceOffset = if pieceLength > blockLength
-                                    then Block False BL.empty pieceOffset blockLength:setBlocks (pieceLength - blockLength) (pieceOffset+blockLength)
-                                    else [Block False BL.empty pieceOffset pieceLength]
+                                    then (pieceOffset,Block False BL.empty pieceOffset blockLength):setBlocks (pieceLength - blockLength) (pieceOffset+blockLength)
+                                    else [(pieceOffset,Block False BL.empty pieceOffset pieceLength)]
 
 setPiece :: SinglePieceInfo -> Piece
-setPiece SinglePieceInfo { getPieceLength = pieceLen } = Piece False $ V.fromList (setBlocks pieceLen 0)
+setPiece SinglePieceInfo { getPieceLength = pieceLen } = Piece False $ M.fromList (setBlocks pieceLen 0)
 
 setPieceList :: PieceInfo -> PieceList
 setPieceList = V.map setPiece

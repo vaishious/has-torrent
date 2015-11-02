@@ -13,6 +13,7 @@ import qualified Data.Vector as V
 import Data.Word
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Set as S
+import qualified Data.Map.Lazy as M
 import Network.Socket hiding (send, sendTo, recv, recvFrom)
 import Network.Socket.ByteString.Lazy
 import System.Timeout
@@ -65,7 +66,7 @@ eraseBlockData :: Block -> Block
 eraseBlockData block = block{ getDownloadStatus = False, getData = BL.empty }
 
 erasePieceData :: Piece -> Piece
-erasePieceData piece = piece{ getBlocks = V.map eraseBlockData $ getBlocks piece }
+erasePieceData piece = piece{ getBlocks = M.map eraseBlockData $ getBlocks piece }
 
 setVerifiedStatus :: Piece -> Piece
 setVerifiedStatus piece = piece{ getVerifiedStatus = True }

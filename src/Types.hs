@@ -1,6 +1,7 @@
 module Types where
 import qualified Data.Vector as V
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.Map.Lazy as M
 import Network.Socket
 import System.IO
 import Data.Word
@@ -48,7 +49,7 @@ data Block = Block {
 
 data Piece = Piece {
                      getVerifiedStatus :: Bool,
-                     getBlocks :: V.Vector Block
+                     getBlocks :: M.Map Int Block
                    } deriving (Show)
 type PieceList = V.Vector Piece
 
