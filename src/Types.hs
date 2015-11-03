@@ -84,7 +84,7 @@ instance Eq Peer where
 
 type PeerList = Z.Zipper Peer
 
-newtype RequestId = RequestId (Int,Int) deriving (Ord,Eq,Show) -- (PieceIndex, BlockOffset)
+newtype RequestId = RequestId (Int,Int,Int) deriving (Ord,Eq,Show) -- (PieceIndex, BlockOffset, BlockLength)
 data Event = None | Started | Stopped | Completed deriving (Eq,Show)
 
 data Stateless = Stateless {

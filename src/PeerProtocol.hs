@@ -118,7 +118,7 @@ recvdBlockData msg constants = do torrent <- get
                                       let maybeBlock = M.lookup (getBlockBegin msg) $ getBlocks piece
                                       unless (isNothing maybeBlock) $ do
                                           let block = fromJust maybeBlock
-                                          let recvId = RequestId (getPieceIndex msg,getBlockBegin msg)
+                                          let recvId = RequestId (getPieceIndex msg,getBlockBegin msg,getBlockLength msg)
                                           when (elem recvId $ getRequestList peer) $ do
                                               let peer = peer{getRequestList = L.delete recvId $ getRequestList peer}
                                               when (S.member recvId $ getActiveBlocks torrent) $ do
