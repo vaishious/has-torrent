@@ -21,6 +21,7 @@ import qualified Data.Map.Lazy as M
 import Network.Socket hiding (send, sendTo, recv, recvFrom)
 import Network.Socket.ByteString.Lazy
 import System.Timeout
+import System.Random
 import Control.Applicative
 import Data.Time
 
@@ -98,6 +99,38 @@ checkAndAddPieces = do torrent <- get
                             put torrent{getPieceDownOrd = xs, getActiveBlocks = S.union (getActiveBlocks torrent) newBlocks}
                             checkAndAddPieces
 
+makeRequests :: S.Set RequestId -> StateT Torrent IO ()
+makeRequests reqFrom = do torrent <- get
+                          let peer = Z.cursor $ getActivePeers torrent
+                          unless (length (getRequestList peer) > minPeerRequests || S.size reqFrom == 0) $ do
+                              id <- lift $ randomRIO (0, S.size reqFrom - 1)
+                              let req = S.elemAt id reqFrom
+                              lift $ send (getSocket peer) $ msgToByteStr $ toReqMsg req
+                              time <- lift getCurrentTime
+                              let peer = peer{getRequestList = req:getRequestList peer,
+                                              getRequestTime = time}
+                              put torrent{getActivePeers = Z.replace peer $ getActivePeers torrent}
+                              makeRequests $ S.deleteAt id reqFrom
+
+activeSend :: Stateless -> StateT Torrent IO ()
+activeSend constants = do torrent <- get
+                          let peer = Z.cursor $ getActivePeers torrent
+                          let (completedList,pendingList) = L.partition (`S.notMember` getActiveBlocks torrent) $ getRequestList peer
+                          let peer = peer{getRequestList = pendingList}
+                          put torrent{getActivePeers = Z.replace peer $ getActivePeers torrent}
+                          lift $ forM_ completedList $ send (getSocket peer) . msgToByteStr . toCanMsg
+                          time <- lift getCurrentTime
+                          if diffUTCTime time (getEffResponseTime peer) >= 90
+                          then put torrent{getActivePeers = Z.delete $ getActivePeers torrent,
+                                           getInactivePeers = Z.push peer $ getInactivePeers torrent}
+                          else do let reqFrom = foldr S.delete (getActiveBlocks torrent) pendingList
+                                  makeRequests reqFrom
+                                  time <- lift getCurrentTime
+                                  when (diffUTCTime time (getRequestTime peer) >= 120) $ do
+                                      lift $ send (getSocket peer) $ msgToByteStr KeepAliveMsg
+                                      let peer = peer{getRequestTime = time}
+                                      put torrent{getActivePeers = Z.replace peer $ getActivePeers torrent}
+
 activePeer :: Stateless -> StateT Torrent IO ()
 activePeer constants = do torrent <- get
                           if Z.endp $ getActivePeers torrent
@@ -107,7 +140,7 @@ activePeer constants = do torrent <- get
                                       peer <- lift $ recvDataPeer peer
                                       put torrent{getActivePeers = Z.replace (execState peerMessages peer) $ getActivePeers torrent}
                                       success <- processedActiveMessages constants
-                                      when success $ do return ()
+                                      when success $ activeSend constants
                                           --TODO : Check if Inactive(by time of response and send the required messages)
 
 recvdBlockData :: Message -> Stateless -> StateT Torrent IO ()
@@ -118,7 +151,7 @@ recvdBlockData msg constants = do torrent <- get
                                       let maybeBlock = M.lookup (getBlockBegin msg) $ getBlocks piece
                                       unless (isNothing maybeBlock) $ do
                                           let block = fromJust maybeBlock
-                                          let recvId = RequestId (getPieceIndex msg,getBlockBegin msg)
+                                          let recvId = RequestId (getPieceIndex msg,getBlockBegin msg,getBlockLength msg)
                                           when (elem recvId $ getRequestList peer) $ do
                                               let peer = peer{getRequestList = L.delete recvId $ getRequestList peer}
                                               when (S.member recvId $ getActiveBlocks torrent) $ do
@@ -134,17 +167,18 @@ processedActiveMessages constants = do torrent <- get
                                        let peer = Z.cursor $ getActivePeers torrent
                                        let messages = getPendingMessages peer
                                        if null messages then return True
-                                       else do let (msg:rest) = messages
-                                               time <- lift getCurrentTime
-                                               let peer = peer {getPendingMessages = rest, getResponseTime = time}
-                                               case msg of ChokeMsg -> do let peer = peer {getEffResponseTime = time,
-                                                                                           getPeerState = (getPeerState peer){getPeerChoking=True},
-                                                                                           getRequestList = []}
-                                                                          put torrent {getActivePeers = Z.delete $ getActivePeers torrent,
-                                                                                       getInactivePeers = Z.push peer $ getInactivePeers torrent}
-                                                                          return False
-                                                           PieceMsg{} -> do let peer = peer {getEffResponseTime = time}
-                                                                            put torrent {getActivePeers = Z.replace peer $ getActivePeers torrent}
-                                                                            recvdBlockData msg constants
-                                                                            processedActiveMessages constants
-                                                           _ -> processedActiveMessages constants
+                                       else do
+                                         let (msg:rest) = messages
+                                         time <- lift getCurrentTime
+                                         let peer = peer {getPendingMessages = rest, getResponseTime = time}
+                                         case msg of ChokeMsg -> do let peer = peer {getEffResponseTime = time,
+                                                                                     getPeerState = (getPeerState peer){getPeerChoking=True},
+                                                                                     getRequestList = []}
+                                                                    put torrent {getActivePeers = Z.delete $ getActivePeers torrent,
+                                                                                 getInactivePeers = Z.push peer $ getInactivePeers torrent}
+                                                                    return False
+                                                     PieceMsg{} -> do let peer = peer {getEffResponseTime = time}
+                                                                      put torrent {getActivePeers = Z.replace peer $ getActivePeers torrent}
+                                                                      recvdBlockData msg constants
+                                                                      processedActiveMessages constants
+                                                     _ -> processedActiveMessages constants

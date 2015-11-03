@@ -43,8 +43,25 @@ getPieceData = BL.concat . map getData . snd . unzip . M.toList . getBlocks
 minActiveBlocks :: Integral a => a
 minActiveBlocks = 100
 
+minPeerRequests :: Integral a => a
+minPeerRequests = 10
+
 pieceToReqs :: Int -> PieceList -> S.Set RequestId
-pieceToReqs index pieces = S.fromList $ map RequestId $ zip (repeat index) $ fst . unzip . M.toList . getBlocks $ pieces V.! index
+pieceToReqs index pieces = S.fromList $ map RequestId $ zip3 (repeat index) (fst $ unzip $ M.toList $ getBlocks (pieces V.! index)) (map getLength (snd $ unzip $ M.toList $ getBlocks (pieces V.! index)))
+
+toReqMsg :: RequestId -> Message
+toReqMsg (RequestId (index,offset,length)) = RequestMsg index offset length
+
+fromReqMsg :: Message -> RequestId
+fromReqMsg (RequestMsg index offset length) = RequestId (index,offset,length)
+fromReqMsg _ = RequestId (0,0,0)
+
+toCanMsg :: RequestId -> Message
+toCanMsg (RequestId (index,offset,length)) = CancelMsg index offset length
+
+fromCanMsg :: Message -> RequestId
+fromCanMsg (CancelMsg index offset length) = RequestId (index,offset,length)
+fromCanMsg _ = RequestId (0,0,0)
 
 initPeerState :: PeerState
 initPeerState = PeerState True False True False
