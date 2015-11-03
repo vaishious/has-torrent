@@ -43,6 +43,9 @@ getPieceData = BL.concat . map getData . snd . unzip . M.toList . getBlocks
 minActiveBlocks :: Integral a => a
 minActiveBlocks = 100
 
+minPeerRequests :: Integral a => a
+minPeerRequests = 10
+
 pieceToReqs :: Int -> PieceList -> S.Set RequestId
 pieceToReqs index pieces = S.fromList $ map RequestId $ zip3 (repeat index) (fst $ unzip $ M.toList $ getBlocks (pieces V.! index)) (map getLength (snd $ unzip $ M.toList $ getBlocks (pieces V.! index)))
 

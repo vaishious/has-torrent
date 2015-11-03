@@ -21,6 +21,7 @@ import qualified Data.Map.Lazy as M
 import Network.Socket hiding (send, sendTo, recv, recvFrom)
 import Network.Socket.ByteString.Lazy
 import System.Timeout
+import System.Random
 import Control.Applicative
 import Data.Time
 
@@ -97,6 +98,19 @@ checkAndAddPieces = do torrent <- get
                             let newBlocks = pieceToReqs x $ getPieces torrent
                             put torrent{getPieceDownOrd = xs, getActiveBlocks = S.union (getActiveBlocks torrent) newBlocks}
                             checkAndAddPieces
+
+makeRequests :: S.Set RequestId -> StateT Torrent IO ()
+makeRequests reqFrom = do torrent <- get
+                          let peer = Z.cursor $ getActivePeers torrent
+                          unless (length (getRequestList peer) > minPeerRequests || S.size reqFrom == 0) $ do
+                              id <- lift $ randomRIO (0, S.size reqFrom - 1)
+                              let req = S.elemAt id reqFrom
+                              lift $ send (getSocket peer) $ msgToByteStr $ toReqMsg req
+                              time <- lift getCurrentTime
+                              let peer = peer{getRequestList = req:getRequestList peer,
+                                              getRequestTime = time}
+                              put torrent{getActivePeers = Z.replace peer $ getActivePeers torrent}
+                              makeRequests $ S.deleteAt id reqFrom
 
 activePeer :: Stateless -> StateT Torrent IO ()
 activePeer constants = do torrent <- get
