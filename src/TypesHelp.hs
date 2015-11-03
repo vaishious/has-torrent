@@ -6,6 +6,15 @@ import qualified Data.Map.Lazy as M
 import qualified Data.Vector as V
 import qualified Data.Set as S
 
+pStr :: String
+pStr = "BitTorrent protocol"
+
+pStrLen :: Int8
+pStrLen = 19
+
+reservedBytes :: BL.ByteString
+reservedBytes = BL.replicate 8 0
+
 -- 16 KB blocks
 blockLength :: (Integral a) => a
 blockLength = 16384
@@ -36,3 +45,6 @@ minActiveBlocks = 100
 
 pieceToReqs :: Int -> PieceList -> S.Set RequestId
 pieceToReqs index pieces = S.fromList $ map RequestId $ zip (repeat index) $ fst . unzip . M.toList . getBlocks $ pieces V.! index
+
+initPeerState :: PeerState
+initPeerState = PeerState True False True False

@@ -1,8 +1,10 @@
 module Communicate where
 import Types
+import TypesHelp
 import Control.Monad.Writer
 import Control.Monad.State
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Lazy.Char8 as LC
 import Data.ByteString.Builder
 import Data.Maybe (fromJust,isNothing)
 import Data.Word
@@ -61,6 +63,24 @@ convert = do message <- get
                                                        _ -> return Nothing
                                   else return Nothing
              else return Nothing
+
+parseHandshake :: Stateless -> State BL.ByteString Bool
+parseHandshake constants = do bs <- get
+                              if BL.length bs >= 49 + fromIntegral (length pStr)
+                              then do let (len,bs) = runState readOneByte bs
+                                      if len == fromIntegral pStrLen
+                                      then do let (pStrByteString,bs) = runState (statefulSplit len) bs
+                                              if LC.unpack pStrByteString == pStr
+                                              then do let (reserved,bs) = runState (statefulSplit 8) bs
+                                                      let (infoHash,bs) = runState (statefulSplit 20) bs
+                                                      if infoHash == getHash (getInfoHash constants)
+                                                      then do let (peerId,bs) = runState (statefulSplit 20) bs
+                                                              put bs
+                                                              return True
+                                                      else return False
+                                              else return False
+                                      else return False
+                              else return False
 
 parseMessages :: State BL.ByteString [Message]
 parseMessages = do bs <- get

@@ -24,30 +24,33 @@ import System.Timeout
 import Control.Applicative
 import Data.Time
 
-pStr :: String
-pStr = "BitTorrent protocol"
+makeTCPSock :: Socket -> SockAddr -> IO Socket
+makeTCPSock sockUDP peerAddr = do bindAddr <- getSocketName sockUDP
+                                  sockTCP <- socket AF_INET Stream defaultProtocol
+                                  setSocketOption sockTCP ReuseAddr 1
+                                  bind sockTCP bindAddr
+                                  connect sockTCP peerAddr
+                                  return sockTCP
 
-pStrLen :: Int8
-pStrLen = 19
-
-reservedBytes :: BL.ByteString
-reservedBytes = BL.replicate 8 0
-
--- remotePort and ipAddr are those of the peer
-makeTCPSock :: Socket -> Int -> Int -> IO Socket
-makeTCPSock sockUDP remotePort ipAddr = do bindAddr <- getSocketName sockUDP
-                                           sockTCP <- socket AF_INET Stream defaultProtocol
-                                           bind sockTCP bindAddr
-                                           connect sockTCP $ SockAddrInet (fromIntegral remotePort) $ fromIntegral ipAddr
-                                           return sockTCP
-
-initHandshake :: Socket -> Stateless -> IO Int
-initHandshake sockTCP constants = fromIntegral <$> send sockTCP (toLazyByteString $ execWriter $ do
+sendHandshake :: Peer -> Stateless -> IO Peer
+sendHandshake (NoHandshakeSent peerAddr) constants = do sockPeer <- makeTCPSock (getUDPSocket constants) peerAddr
+                                                        send sockPeer (toLazyByteString $ execWriter $ do
                                                                                     tell $ int8 pStrLen
                                                                                     tell $ string8 pStr
                                                                                     tell $ lazyByteString reservedBytes
                                                                                     tell $ lazyByteString $ getHash $ getInfoHash constants
                                                                                     tell $ lazyByteString $ getHash $ getPeerId constants)
+                                                        return $ NoHandshakeRecvd peerAddr sockPeer BL.empty
+sendHandshake peer _ = return peer
+
+recvHandshake :: Peer -> Stateless -> IO Peer
+recvHandshake peer@(NoHandshakeRecvd {}) constants = do peer <- recvDataPeer peer
+                                                        let (handshakeSucc,rest) = runState (parseHandshake constants) $ getUnparsed peer
+                                                        if handshakeSucc
+                                                        then do time <- getCurrentTime
+                                                                return $ Handshake (getPeerAddress peer) initPeerState (getSocket peer) rest [] time time time []
+                                                        else return peer
+recvHandshake peer _ = return peer
 
 appendDataPeer :: Peer -> BL.ByteString -> IO Peer
 appendDataPeer (NoHandshakeSent sockaddr) _ = return $ NoHandshakeSent sockaddr
