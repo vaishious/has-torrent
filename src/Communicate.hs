@@ -13,6 +13,11 @@ readOneByte = state $ \bs -> let (left,right) = BL.splitAt 1 bs
                                  word8 = BY.decode left :: Word8
                              in (fromIntegral word8,right)
 
+readTwoBytes :: State BL.ByteString Int
+readTwoBytes = state $ \bs -> let (left,right) = BL.splitAt 2 bs
+                                  word16 = BY.decode left :: Word16
+                              in (fromIntegral word16,right)
+
 readFourBytes :: State BL.ByteString Int
 readFourBytes = state $ \bs -> let (left,right) = BL.splitAt 4 bs
                                    word32 = BY.decode left :: Word32
@@ -37,6 +42,8 @@ convert = do message <- get
                                                        3 -> return $ Just NotInterestedMsg
                                                        4 -> do index <- readFourBytes
                                                                return $ Just $ HaveMsg index
+                                                       5 -> do bitfield <- statefulSplit (len - 1)
+                                                               return $ Just $ BitfieldMsg bitfield
                                                        6 -> do index  <- readFourBytes
                                                                begin  <- readFourBytes
                                                                length <- readFourBytes
@@ -49,6 +56,8 @@ convert = do message <- get
                                                                begin  <- readFourBytes
                                                                length <- readFourBytes
                                                                return $ Just $ CancelMsg index begin length
+                                                       9 -> do port <- readTwoBytes
+                                                               return $ Just $ PortMsg port
                                                        _ -> return Nothing
                                   else return Nothing
              else return Nothing

@@ -115,6 +115,9 @@ data Message = KeepAliveMsg
              | HaveMsg {
                          getPieceIndex :: Int
                        }
+             | BitfieldMsg {
+                             getBitfield :: BL.ByteString
+                           }
              | RequestMsg {
                             getPieceIndex :: Int,
                             getBlockBegin :: Int,
@@ -130,4 +133,7 @@ data Message = KeepAliveMsg
                            getPieceIndex :: Int,
                            getBlockBegin :: Int,
                            getBlockLength :: Int
-                         } deriving (Show)
+                         }
+             | PortMsg {
+                         getPort :: Int
+                       } deriving (Show)
