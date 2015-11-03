@@ -98,6 +98,24 @@ checkAndAddPieces = do torrent <- get
                             put torrent{getPieceDownOrd = xs, getActiveBlocks = S.union (getActiveBlocks torrent) newBlocks}
                             checkAndAddPieces
 
+activeSend :: Stateless -> StateT Torrent IO ()
+activeSend constants = do torrent <- get
+                          let peer = Z.cursor $ getActivePeers torrent
+                          let (completedList,pendingList) = L.partition (`S.notMember` getActiveBlocks torrent) $ getRequestList peer
+                          let peer = peer{getRequestList = pendingList}
+                          lift $ forM_ completedList (\req -> send (getSocket peer) (msgToByteStr $ toCanMsg req))
+                          time <- lift getCurrentTime
+                          if (diffUTCTime time (getEffResponseTime peer)) >= 90
+                          then do put torrent{getActivePeers = Z.delete $ getActivePeers torrent,
+                                              getInactivePeers = Z.push peer $ getInactivePeers torrent}
+                          else do time <- lift getCurrentTime
+                                  if (diffUTCTime time (getRequestTime peer)) >= 120
+                                  then do lift $ send (getSocket peer) $ msgToByteStr KeepAliveMsg
+                                          let peer = peer{getRequestTime = time}
+                                          put torrent{getActivePeers = Z.replace peer $ getActivePeers torrent}
+                                  else return ()
+
+
 activePeer :: Stateless -> StateT Torrent IO ()
 activePeer constants = do torrent <- get
                           if Z.endp $ getActivePeers torrent
