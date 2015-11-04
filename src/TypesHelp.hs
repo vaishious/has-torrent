@@ -47,6 +47,9 @@ minActiveBlocks = 100
 minPeerRequests :: Integral a => a
 minPeerRequests = 10
 
+maxActivePeers :: Integral a => a
+maxActivePeers = 30
+
 pieceToReqs :: Int -> PieceList -> S.Set RequestId
 pieceToReqs index pieces = S.fromList $ map RequestId $ zip3 (repeat index) (fst $ unzip $ M.toList $ getBlocks (pieces V.! index)) (map getLength (snd $ unzip $ M.toList $ getBlocks (pieces V.! index)))
 

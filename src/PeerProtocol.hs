@@ -135,15 +135,74 @@ activePeer :: Stateless -> StateT Torrent IO ()
 activePeer constants = do torrent <- get
                           if Z.endp $ getActivePeers torrent
                               then do put torrent{getActivePeers = Z.start $ getActivePeers torrent}
-                                      -- TODO: inactivePeer
+                                      inactivePeer constants
                               else do let peer = Z.cursor $ getActivePeers torrent
                                       peer <- lift $ recvDataPeer peer
-                                      put torrent{getActivePeers = Z.replace (execState peerMessages peer) $ getActivePeers torrent}
+                                      let peer = execState peerMessages peer
+                                      put torrent{getActivePeers = Z.replace peer $ getActivePeers torrent}
                                       success <- processedActiveMessages constants
                                       when success $ do
                                           activeSend constants
                                           put torrent{getActivePeers = Z.right $ getActivePeers torrent}
                                       activePeer constants
+
+inactivePeer :: Stateless -> StateT Torrent IO ()
+inactivePeer constants = do torrent <- get
+                            if Z.endp $ getInactivePeers torrent
+                                then do put torrent{getInactivePeers = Z.start $ getInactivePeers torrent}
+                                        -- Check and add peers?
+                                else do let peer = Z.cursor $ getInactivePeers torrent
+                                        case peer of
+                                             Handshake{} -> do peer <- lift $ recvDataPeer peer
+                                                               let peer = execState peerMessages peer
+                                                               put torrent{getInactivePeers = Z.replace peer $ getInactivePeers torrent}
+                                                               success <- processedInactiveMessages constants
+                                                               return ()
+                                                               when success $ do
+                                                                   --inactiveSend constants
+                                                                   put torrent{getInactivePeers = Z.right $ getInactivePeers torrent}
+                                                               inactivePeer constants
+
+
+processedInactiveMessages :: Stateless -> StateT Torrent IO Bool
+processedInactiveMessages constants = do torrent <- get
+                                         let peer = Z.cursor $ getInactivePeers torrent
+                                         let messages = getPendingMessages peer
+                                         if null messages then return True
+                                         else do
+                                            let (msg:rest) = messages
+                                            time <- lift getCurrentTime
+                                            let peer = peer{getResponseTime = time}
+                                            case msg of ChokeMsg -> do
+                                                            let peer = peer{getEffResponseTime=time,
+                                                                            getPeerState = (getPeerState peer){getPeerChoking=True},
+                                                                            getRequestList = [],
+                                                                            getPendingMessages = rest}
+                                                            put torrent{getInactivePeers = Z.replace peer $ getInactivePeers torrent}
+                                                            processedInactiveMessages constants
+
+                                                        UnchokeMsg -> do
+                                                            let peer = peer{getEffResponseTime=time,
+                                                                            getPeerState = (getPeerState peer){getPeerChoking=False},
+                                                                            getPendingMessages = rest}
+                                                            if getAmInterested (getPeerState peer) && zipLength (getActivePeers torrent) <= maxActivePeers
+                                                            then do put torrent{getInactivePeers = Z.delete $ getInactivePeers torrent,
+                                                                                getActivePeers = Z.push peer $ getActivePeers torrent}
+                                                                    return False
+                                                            else do put torrent{getInactivePeers = Z.replace peer $ getInactivePeers torrent}
+                                                                    processedInactiveMessages constants
+
+                                                        PieceMsg{} -> do
+                                                            let peer = peer{getEffResponseTime=time,
+                                                                            getPendingMessages = messages}
+                                                            if zipLength (getActivePeers torrent) <= maxActivePeers
+                                                            then do put torrent{getInactivePeers = Z.delete $ getInactivePeers torrent,
+                                                                                getActivePeers = Z.push peer $ getActivePeers torrent}
+                                                                    return False
+                                                            else do put torrent{getInactivePeers = Z.right $ Z.replace peer $ getInactivePeers torrent}
+                                                                    return False
+
+                                                        _ -> processedInactiveMessages constants
 
 recvdBlockData :: Message -> Stateless -> StateT Torrent IO ()
 recvdBlockData msg constants = do torrent <- get
