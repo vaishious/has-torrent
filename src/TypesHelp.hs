@@ -5,6 +5,7 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.Map.Lazy as M
 import qualified Data.Vector as V
 import qualified Data.Set as S
+import qualified Data.List.Zipper as Z
 
 requestTime :: (Num a) => a
 requestTime = 120
@@ -55,6 +56,9 @@ minActiveBlocks = 100
 minPeerRequests :: Integral a => a
 minPeerRequests = 10
 
+maxActivePeers :: Integral a => a
+maxActivePeers = 30
+
 pieceToReqs :: Int -> PieceList -> S.Set RequestId
 pieceToReqs index pieces = S.fromList $ map RequestId $ zip3 (repeat index) (fst $ unzip $ M.toList $ getBlocks (pieces V.! index)) (map getLength (snd $ unzip $ M.toList $ getBlocks (pieces V.! index)))
 
@@ -74,3 +78,6 @@ fromCanMsg _ = RequestId (0,0,0)
 
 initPeerState :: PeerState
 initPeerState = PeerState True False True False
+
+zipLength :: Z.Zipper a -> Int
+zipLength (Z.Zip x y) = length x + length y
