@@ -147,7 +147,7 @@ inactiveSend constants = do torrent <- get
                                  else when (diffUTCTime time (getRequestTime peer) >= requestTime) $ do
                                              lift $ send (getSocket peer) $ msgToByteStr KeepAliveMsg
                                              let peer = peer{getRequestTime = time}
-                                             put torrent{getActivePeers = Z.replace peer $ getActivePeers torrent}
+                                             put torrent{getInactivePeers = Z.replace peer $ getInactivePeers torrent}
 
 activePeer :: Stateless -> StateT Torrent IO ()
 activePeer constants = do torrent <- get
