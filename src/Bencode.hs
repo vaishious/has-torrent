@@ -98,7 +98,9 @@ announceList be = case successiveLookup ["announce-list"] be of
 uriToTracker :: String -> Tracker
 uriToTracker uri = case filter isLetter $ uriScheme parsedURI of
                            "http" -> HTTPTracker uri
-                           "udp"  -> UDPTracker (uriRegName auth) (fromIntegral $ read $ filter isNumber $ uriPort auth)
+                           "udp"  -> let port = uriPort auth
+                                     in if null port then UDPTracker (uriRegName auth) 443
+                                         else UDPTracker (uriRegName auth) (fromIntegral $ read $ filter isNumber $ uriPort auth)
                                   where auth = fromJust $ uriAuthority parsedURI
                  where parsedURI = fromJust $ parseURI uri
 
