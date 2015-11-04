@@ -88,12 +88,12 @@ setPieceInfo :: [Int] -> [BL.ByteString] -> FileList -> PieceInfo
 setPieceInfo lenList hashList fileList = V.fromList $ zipWith3 SinglePieceInfo lenList (map Hash hashList) (coveredFileList fileList (map fromIntegral lenList))
 
 -- What if input is not of the type (BList a)?
-announceURL :: BEncode -> String
-announceURL (BList urlList) = extractString $ head urlList
+announceURL :: BEncode -> [String]
+announceURL (BList urlList) = map extractString urlList
 
 announceList :: Maybe BEncode -> Maybe [String]
 announceList be = case successiveLookup ["announce-list"] be of
-                          (Just (BList announceList)) -> Just $ map announceURL announceList
+                          (Just (BList announceList)) -> Just $ concatMap announceURL announceList
                           _                           -> Nothing
 
 uriToTracker :: String -> Tracker
