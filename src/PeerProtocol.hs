@@ -89,15 +89,16 @@ verifyHashAndWrite index constants = StateT $ \torrent -> if computedHash torren
                                                                   let pieces = (V.//) (getPieces torrent) [(index,erasePieceData $ getPieces torrent V.! index)]
                                                                   return ((),torrent{ getPieceDownOrd = pdo ++ [index], getPieces = pieces })
 
-checkAndAddPieces :: StateT Torrent IO ()
-checkAndAddPieces = do torrent <- get
-                       let numActiveBlocks = S.size $ getActiveBlocks torrent
-                       let pieceOrd = getPieceDownOrd torrent
-                       unless (numActiveBlocks >= minActiveBlocks || null pieceOrd) $ do
-                            let x:xs = pieceOrd
-                            let newBlocks = pieceToReqs x $ getPieces torrent
-                            put torrent{getPieceDownOrd = xs, getActiveBlocks = S.union (getActiveBlocks torrent) newBlocks}
-                            checkAndAddPieces
+checkAndAddPieces :: Stateless -> StateT Torrent IO ()
+checkAndAddPieces constants = do torrent <- get
+                                 let numActiveBlocks = S.size $ getActiveBlocks torrent
+                                 let pieceOrd = getPieceDownOrd torrent
+                                 if numActiveBlocks >= minActiveBlocks || null pieceOrd
+                                 then unless (numActiveBlocks == 0) $ activePeer constants
+                                 else do let x:xs = pieceOrd
+                                         let newBlocks = pieceToReqs x $ getPieces torrent
+                                         put torrent{getPieceDownOrd = xs, getActiveBlocks = S.union (getActiveBlocks torrent) newBlocks}
+                                         checkAndAddPieces constants
 
 makeRequests :: S.Set RequestId -> StateT Torrent IO ()
 makeRequests reqFrom = do torrent <- get
@@ -139,7 +140,7 @@ inactiveSend constants = do torrent <- get
                             then do lift $ close $ getSocket peer
                                     let peer = NoHandshakeSent $ getPeerAddress peer
                                     put torrent{getInactivePeers = Z.replace peer $ getInactivePeers torrent}
-                            else if (getAmInterested $ getPeerState peer)
+                            else if getAmInterested $ getPeerState peer
                                  then do lift $ send (getSocket peer) $ msgToByteStr InterestedMsg
                                          let peerstate = (getPeerState peer){getAmInterested = True}
                                          let peer = peer{getPeerState = peerstate, getRequestTime = time}
@@ -168,7 +169,7 @@ inactivePeer :: Stateless -> StateT Torrent IO ()
 inactivePeer constants = do torrent <- get
                             if Z.endp $ getInactivePeers torrent
                                 then do put torrent{getInactivePeers = Z.start $ getInactivePeers torrent}
-                                        -- Check and add peers?
+                                        checkAndAddPieces constants
                                 else do let peer = Z.cursor $ getInactivePeers torrent
                                         case peer of
                                              NoHandshakeSent {} -> do peer <- lift $ sendHandshake peer constants
