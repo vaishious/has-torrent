@@ -131,6 +131,28 @@ activeSend constants = do torrent <- get
                                       let peer = peer{getRequestTime = time}
                                       put torrent{getActivePeers = Z.replace peer $ getActivePeers torrent}
 
+inactiveSend :: Stateless -> StateT Torrent IO ()
+inactiveSend constants = do torrent <- get
+                            let peer = Z.cursor $ getInactivePeers torrent
+                            case peer of
+                                 NoHandshakeSent {} -> do peer <- lift $ sendHandshake peer constants
+                                                          put torrent{getInactivePeers = Z.replace peer $ getInactivePeers torrent}
+                                 NoHandshakeRecvd {} -> do peer <- lift $ recvHandshake peer constants
+                                                           put torrent{getInactivePeers = Z.replace peer $ getInactivePeers torrent}
+                                 _ -> do time <- lift getCurrentTime
+                                         if diffUTCTime time (getResponseTime peer) >= 240
+                                         then do lift $ close $ getSocket peer
+                                                 let peer = NoHandshakeSent $ getPeerAddress peer
+                                                 put torrent{getInactivePeers = Z.replace peer $ getInactivePeers torrent}
+                                         else unless (getAmInterested $ getPeerState peer) $ do
+                                                    time <- lift getCurrentTime
+                                                    lift $ send (getSocket peer) (msgToByteStr InterestedMsg)
+                                                    let peerstate = (getPeerState peer){getAmInterested = True}
+                                                    let peer = peer{getPeerState = peerstate, getRequestTime = time}
+                                                    -- Handle size of active list
+                                                    put torrent{getInactivePeers = Z.delete $ getInactivePeers torrent,
+                                                                getActivePeers = Z.push peer $ getActivePeers torrent}
+
 activePeer :: Stateless -> StateT Torrent IO ()
 activePeer constants = do torrent <- get
                           if Z.endp $ getActivePeers torrent
