@@ -5,6 +5,7 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.Map.Lazy as M
 import qualified Data.Vector as V
 import qualified Data.Set as S
+import qualified Data.List.Zipper as Z
 
 pStr :: String
 pStr = "BitTorrent protocol"
@@ -65,3 +66,6 @@ fromCanMsg _ = RequestId (0,0,0)
 
 initPeerState :: PeerState
 initPeerState = PeerState True False True False
+
+zipLength :: Z.Zipper a -> Int
+zipLength (Z.Zip x y) = length x + length y
