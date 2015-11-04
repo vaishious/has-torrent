@@ -6,6 +6,15 @@ import qualified Data.Map.Lazy as M
 import qualified Data.Vector as V
 import qualified Data.Set as S
 
+requestTime :: (Num a) => a
+requestTime = 120
+
+responseTime :: (Num a) => a
+responseTime = 240
+
+effResponseTime :: (Num a) => a
+effResponseTime = 90
+
 pStr :: String
 pStr = "BitTorrent protocol"
 
