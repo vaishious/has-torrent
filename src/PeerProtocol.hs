@@ -140,8 +140,10 @@ activePeer constants = do torrent <- get
                                       peer <- lift $ recvDataPeer peer
                                       put torrent{getActivePeers = Z.replace (execState peerMessages peer) $ getActivePeers torrent}
                                       success <- processedActiveMessages constants
-                                      when success $ activeSend constants
-                                          --TODO : Check if Inactive(by time of response and send the required messages)
+                                      when success $ do
+                                          activeSend constants
+                                          put torrent{getActivePeers = Z.right $ getActivePeers torrent}
+                                      activePeer constants
 
 recvdBlockData :: Message -> Stateless -> StateT Torrent IO ()
 recvdBlockData msg constants = do torrent <- get
