@@ -107,6 +107,12 @@ uriToTracker uri = case filter isLetter $ uriScheme parsedURI of
 readTrackerList :: [String] -> TrackerList
 readTrackerList = map uriToTracker
 
+extractTrackers :: Maybe BEncode -> TrackerList
+extractTrackers be = case announceList be
+                        of Just uriList-> readTrackerList uriList
+                           Nothing -> let (BString announce) = fromJust $ successiveLookup ["announce"] be
+                                      in [uriToTracker $ LC.unpack announce]
+
 runningSum :: [Integer] -> [Integer]
 runningSum = scanl1 (+)
 
@@ -165,7 +171,7 @@ setStateless torrentFile = do be             <- readAndDecode torrentFile
                               let rootPath    = getRootPath be
                               fileList       <- createAllFiles rootPath (getFiles (fromJust $ readFileDict be))
                               let infoHash    = Hash $ fromJust $ findInfoHash be
-                              let trackerList = readTrackerList $ fromJust $ announceList be
+                              let trackerList = extractTrackers be
                               let pieceLenList = pieceLengthList (getOverallSize fileList) (fromJust $ readPieceLength be)
                               let pieceInfo   = setPieceInfo pieceLenList (fromJust $ pieceHashList be) fileList
                               return $ Just $ Stateless infoHash pieceInfo (Hash peerID) trackerList fileList tcpSocket udpSocket
