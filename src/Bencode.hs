@@ -7,6 +7,8 @@ import Crypto.Hash.SHA1
 import Data.Int
 import qualified Data.Vector as V
 import qualified Data.ByteString.Lazy.Char8 as LC
+import qualified Data.Text as T
+import Data.Text.Encoding
 import Data.Byteable
 import Types
 import Network.URI
@@ -45,7 +47,7 @@ getFiles (BList (BDict map:xs)) = (pathlist,len) : getFiles (BList xs)
 getFiles _                      = []
 
 extractString :: BEncode -> String
-extractString (BString str) = LC.unpack str
+extractString (BString str) = T.unpack $ decodeUtf8 $ LC.toStrict str
 extractString _ = ""
 
 getRootPath :: Maybe BEncode -> FilePath
@@ -87,8 +89,7 @@ setPieceInfo lenList hashList fileList = V.fromList $ zipWith3 SinglePieceInfo l
 
 -- What if input is not of the type (BList a)?
 announceURL :: BEncode -> String
-announceURL (BList urlList) = LC.unpack url
-                         where (BString url) = head urlList
+announceURL (BList urlList) = extractString $ head urlList
 
 announceList :: Maybe BEncode -> Maybe [String]
 announceList be = case successiveLookup ["announce-list"] be of
@@ -110,8 +111,7 @@ readTrackerList = map uriToTracker
 extractTrackers :: Maybe BEncode -> TrackerList
 extractTrackers be = case announceList be
                         of Just uriList-> readTrackerList uriList
-                           Nothing -> let (BString announce) = fromJust $ successiveLookup ["announce"] be
-                                      in [uriToTracker $ LC.unpack announce]
+                           Nothing -> [uriToTracker $ extractString $ fromJust $ successiveLookup ["announce"] be]
 
 runningSum :: [Integer] -> [Integer]
 runningSum = scanl1 (+)
