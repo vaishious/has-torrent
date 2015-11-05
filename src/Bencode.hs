@@ -1,4 +1,7 @@
-module Bencode where
+module Bencode (
+                   setStateless,
+                   setStateful,
+               ) where
 import TypesHelp
 import Data.BEncode
 import qualified Data.ByteString.Lazy as BL
@@ -24,19 +27,15 @@ import qualified Data.Set as S
 import System.Random.Shuffle (shuffleM)
 import qualified Data.List.Zipper as Z
 
-lenHash :: Int
-lenHash = 20
-
 readAndDecode :: FilePath -> IO (Maybe BEncode)
 readAndDecode fp = do bs <- BL.readFile fp
                       return $ bRead bs
 
-findInfoHash :: Maybe BEncode -> Maybe BL.ByteString
-findInfoHash (Just (BDict be)) = Just $ BL.fromStrict $ toBytes $ hashlazy $ bPack infoDict
-                           where Just infoDict = M.lookup "info" be
-findInfoHash _ = Nothing
+findInfoHash :: BEncode -> Maybe BL.ByteString
+findInfoHash (BDict be) = fmap (BL.fromStrict . toBytes . hashlazy . bPack) (M.lookup "info" be)
+findInfoHash _          = Nothing
 
-readFileDict :: Maybe BEncode -> Maybe BEncode
+readFileDict :: BEncode -> Maybe BEncode
 readFileDict = successiveLookup ["info","files"]
 
 getFiles :: BEncode -> [([FilePath],Integer)]
@@ -50,15 +49,15 @@ extractString :: BEncode -> String
 extractString (BString str) = T.unpack $ decodeUtf8 $ LC.toStrict str
 extractString _ = ""
 
-getRootPath :: Maybe BEncode -> FilePath
-getRootPath = extractString . fromJust . successiveLookup ["info","name"]
+getRootPath :: BEncode -> Maybe FilePath
+getRootPath be = fmap extractString (successiveLookup ["info","name"] be)
 
 decodePath :: [BEncode] -> [FilePath]
 decodePath = map extractString
 
-successiveLookup :: [String] -> Maybe BEncode -> Maybe BEncode
-successiveLookup [] be = be
-successiveLookup (x:xs) (Just (BDict bd)) = successiveLookup xs (M.lookup x bd)
+successiveLookup :: [String] -> BEncode -> Maybe BEncode
+successiveLookup [] be = Just be
+successiveLookup (x:xs) (BDict bd) = maybe Nothing (successiveLookup xs) (M.lookup x bd)
 successiveLookup _ _ = Nothing
 
 splitPieceHash :: BL.ByteString -> [BL.ByteString]
@@ -67,7 +66,7 @@ splitPieceHash piecehash = case BL.length piecehash > 0 of
                                     where (head,piecehash') = BL.splitAt (fromIntegral lenHash) piecehash
                                _    -> []
 
-pieceHashList :: Maybe BEncode -> Maybe [BL.ByteString]
+pieceHashList :: BEncode -> Maybe [BL.ByteString]
 pieceHashList be = case successiveLookup ["info","pieces"] be of
                         (Just (BString bs)) -> Just $ splitPieceHash bs
                         _                   -> Nothing
@@ -75,7 +74,7 @@ pieceHashList be = case successiveLookup ["info","pieces"] be of
 getOverallSize :: FileList -> Integer
 getOverallSize = V.foldr ((+) . getSize) 0
 
-readPieceLength :: Maybe BEncode -> Maybe Integer
+readPieceLength :: BEncode -> Maybe Integer
 readPieceLength be = case successiveLookup ["info","piece length"] be of
                       (Just (BInt len)) -> Just len
                       _                 -> Nothing
@@ -91,11 +90,13 @@ setPieceInfo lenList hashList fileList = V.fromList $ zipWith3 SinglePieceInfo l
 announceURL :: BEncode -> [String]
 announceURL (BList urlList) = map extractString urlList
 
-announceList :: Maybe BEncode -> Maybe [String]
+announceList :: BEncode -> Maybe [String]
 announceList be = case successiveLookup ["announce-list"] be of
                           (Just (BList announceList)) -> Just $ concatMap announceURL announceList
                           _                           -> Nothing
 
+-- Handle HTTPS?
+-- Test for isJust?
 uriToTracker :: String -> Tracker
 uriToTracker uri = case filter isLetter $ uriScheme parsedURI of
                            "http" -> HTTPTracker uri
@@ -108,10 +109,12 @@ uriToTracker uri = case filter isLetter $ uriScheme parsedURI of
 readTrackerList :: [String] -> TrackerList
 readTrackerList = map uriToTracker
 
-extractTrackers :: Maybe BEncode -> TrackerList
+extractTrackers :: BEncode -> Maybe TrackerList
 extractTrackers be = case announceList be
-                        of Just uriList-> readTrackerList uriList
-                           Nothing -> [uriToTracker $ extractString $ fromJust $ successiveLookup ["announce"] be]
+                        of Just uriList -> Just $ readTrackerList uriList
+                           Nothing -> if isJust (successiveLookup ["announce"] be)
+                                      then Just [uriToTracker $ extractString $ fromJust $ successiveLookup ["announce"] be]
+                                      else Nothing
 
 runningSum :: [Integer] -> [Integer]
 runningSum = scanl1 (+)
@@ -162,19 +165,33 @@ listeningTCP udpPort = do sock <- socket AF_INET Stream defaultProtocol
                           listen sock 2
                           return sock
 
+performChecks :: Maybe BEncode -> Bool
+performChecks (Just be) = all ($ be) [
+                                         isJust . getRootPath,
+                                         isJust . readFileDict,
+                                         isJust . findInfoHash,
+                                         isJust . extractTrackers,
+                                         isJust . readPieceLength,
+                                         isJust . pieceHashList
+                                     ]
+performChecks _         = False
+
 setStateless :: FilePath -> IO (Maybe Stateless)
-setStateless torrentFile = do be             <- readAndDecode torrentFile
-                              peerID         <- genPeerID
-                              udpSocket      <- makeUDPSock
-                              port           <- socketPort udpSocket
-                              tcpSocket      <- listeningTCP port
-                              let rootPath    = getRootPath be
-                              fileList       <- createAllFiles rootPath (getFiles (fromJust $ readFileDict be))
-                              let infoHash    = Hash $ fromJust $ findInfoHash be
-                              let trackerList = extractTrackers be
-                              let pieceLenList = pieceLengthList (getOverallSize fileList) (fromJust $ readPieceLength be)
-                              let pieceInfo   = setPieceInfo pieceLenList (fromJust $ pieceHashList be) fileList
-                              return $ Just $ Stateless infoHash pieceInfo (Hash peerID) trackerList fileList tcpSocket udpSocket
+setStateless torrentFile = do maybeBE             <- readAndDecode torrentFile
+                              if performChecks maybeBE
+                              then do let be = fromJust maybeBE
+                                      peerID         <- genPeerID
+                                      udpSocket      <- makeUDPSock
+                                      port           <- socketPort udpSocket
+                                      tcpSocket      <- listeningTCP port
+                                      let rootPath    = fromJust $ getRootPath be
+                                      fileList       <- createAllFiles rootPath (getFiles (fromJust $ readFileDict be))
+                                      let infoHash    = Hash $ fromJust $ findInfoHash be
+                                      let trackerList = fromJust $ extractTrackers be
+                                      let pieceLenList = pieceLengthList (getOverallSize fileList) (fromJust $ readPieceLength be)
+                                      let pieceInfo   = setPieceInfo pieceLenList (fromJust $ pieceHashList be) fileList
+                                      return $ Just $ Stateless infoHash pieceInfo (Hash peerID) trackerList fileList tcpSocket udpSocket
+                              else return Nothing
 
 randomPerm :: (Integral a) => a -> IO [a]
 randomPerm numPieces = shuffleM [0..(numPieces-1)]
