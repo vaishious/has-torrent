@@ -27,7 +27,8 @@ findNewTracker constants (tracker:xs) = do torrent <- get
                                            peers <- lift $ getPeers tracker constants torrent
                                            new <- addUniquePeers peers
                                            if new == 0 then findNewTracker constants xs
-                                           else put torrent{getActiveTracker = Just tracker}
+                                           else do torrent <- get
+                                                   put torrent{getActiveTracker = Just tracker}
 
 findAndAddPeers :: Stateless -> StateT Torrent IO ()
 findAndAddPeers constants = do torrent <- get
