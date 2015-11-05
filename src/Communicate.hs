@@ -90,19 +90,14 @@ parseMessages = do bs <- get
 parseHandshake :: Stateless -> State BL.ByteString Bool
 parseHandshake constants = do bs <- get
                               if BL.length bs >= 49 + fromIntegral (length pStr)
-                              then do let (len,bs) = runState readOneByte bs
-                                      if len == fromIntegral pStrLen
-                                      then do let (pStrByteString,bs) = runState (statefulSplit len) bs
-                                              if LC.unpack pStrByteString == pStr
-                                              then do let (reserved,bs) = runState (statefulSplit 8) bs     -- Do we need to check reserved bytes?
-                                                      let (infoHash,bs) = runState (statefulSplit lenHash) bs
-                                                      if infoHash == getHash (getInfoHash constants)
-                                                      then do let (peerId,bs) = runState (statefulSplit lenHash) bs
-                                                              put bs
-                                                              return True
-                                                      else return False
-                                              else return False
-                                      else return False
+                              then do len <- readOneByte
+                                      pStrByteString <- statefulSplit pStrLen
+                                      reserved <- statefulSplit 8              -- Do we need to check reserved bytes?
+                                      infoHash <- statefulSplit lenHash
+                                      peerId <- statefulSplit lenHash
+                                      if (len /= pStrLen || LC.unpack pStrByteString /= pStr || infoHash /= getHash (getInfoHash constants))
+                                      then return False                        -- Should we take some action here?
+                                      else return True
                               else return False
 
 -- Convert the peer (stateful) to a new peer after appending the newly parsed messages using parseMessages

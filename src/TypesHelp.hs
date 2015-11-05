@@ -22,7 +22,7 @@ effResponseTime = 90
 pStr :: String
 pStr = "BitTorrent protocol"
 
-pStrLen :: Int8
+pStrLen :: (Integral a) => a
 pStrLen = 19
 
 reservedBytes :: BL.ByteString
