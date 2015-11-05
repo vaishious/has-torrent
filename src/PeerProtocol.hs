@@ -81,13 +81,13 @@ setVerifiedStatus :: Piece -> Piece
 setVerifiedStatus piece = piece{ getVerifiedStatus = True }
 
 verifyHashAndWrite :: Int -> Stateless -> StateT Torrent IO ()
-verifyHashAndWrite index constants = StateT $ \torrent -> if computedHash torrent index == expectedHash constants index
-                                                          then do forkIO $ writePiece index constants torrent
-                                                                  let pieces = (V.//) (getPieces torrent) [(index,setVerifiedStatus $ getPieces torrent V.! index)]
-                                                                  return ((),torrent{ getPieces = pieces })
-                                                          else do let pdo = getPieceDownOrd torrent
-                                                                  let pieces = (V.//) (getPieces torrent) [(index,erasePieceData $ getPieces torrent V.! index)]
-                                                                  return ((),torrent{ getPieceDownOrd = pdo ++ [index], getPieces = pieces })
+verifyHashAndWrite index constants = do torrent <- get
+                                        if computedHash torrent index == expectedHash constants index
+                                        then do lift $ forkIO $ writePiece index constants torrent
+                                                let pieces = (V.//) (getPieces torrent) [(index,setVerifiedStatus $ getPieces torrent V.! index)]
+                                                put torrent{getPieces = pieces}
+                                        else do let pieces = (V.//) (getPieces torrent) [(index,erasePieceData $ getPieces torrent V.! index)]
+                                                put torrent{getPieceDownOrd = getPieceDownOrd torrent ++ [index], getPieces = pieces}
 
 checkAndAddPieces :: Stateless -> StateT Torrent IO ()
 checkAndAddPieces constants = do torrent <- get

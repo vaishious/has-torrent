@@ -62,5 +62,7 @@ splitWrite pieceData (CoveredFile fpath off len:xs) = do fd <- openFd fpath Writ
                                                          closeFd fd
                                                          splitWrite restData xs
 
+-- Writes a piece to the respective files it covers
+-- Called after the checksum of the piece has been verified
 writePiece :: Int -> Stateless -> Torrent -> IO ()
 writePiece index constants torrent = splitWrite (getPieceData $ getPieces torrent V.! index) $ V.toList $ getCoveredFileList $ getPieceInfo constants V.! index
