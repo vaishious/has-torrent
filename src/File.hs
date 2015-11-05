@@ -2,7 +2,7 @@
 module File (
                 spaceAvailable,
                 createAllFiles,
-                writePiece
+                writePiece,
             ) where
 import Types
 import TypesHelp
