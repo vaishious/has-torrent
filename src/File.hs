@@ -61,6 +61,7 @@ splitWrite pieceData (CoveredFile fpath off len:xs) = do fd <- openFd fpath Writ
                                                          fdPwrite fd (BL.toStrict cFileData) $ COff $ fromIntegral off
                                                          closeFd fd
                                                          splitWrite restData xs
+splitWrite _ [] = return ()
 
 -- Writes a piece to the respective files it covers
 -- Called after the checksum of the piece has been verified
