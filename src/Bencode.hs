@@ -10,7 +10,6 @@ import Data.BEncode
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Map as M
 import Crypto.Hash.SHA1
-import Data.Int
 import qualified Data.Vector as V
 import qualified Data.ByteString.Lazy.Char8 as LC
 import qualified Data.Text as T
@@ -27,17 +26,21 @@ import qualified Data.Set as S
 import System.Random.Shuffle (shuffleM)
 import qualified Data.List.Zipper as Z
 
+-- Reads the and parses the bencoded dictionary of the .torrent file provided
 readAndDecode :: FilePath -> IO (Maybe BEncode)
 readAndDecode fp = do bs <- BL.readFile fp
                       return $ bRead bs
 
+-- Computes the hash of the info dictionary in the .torrent file
 findInfoHash :: BEncode -> Maybe BL.ByteString
 findInfoHash (BDict be) = fmap (BL.fromStrict . hashlazy . bPack) (M.lookup "info" be)
 findInfoHash _          = Nothing
 
+-- Reads the file dict from the info dictionary
 readFileDict :: BEncode -> Maybe BEncode
 readFileDict = successiveLookup ["info","files"]
 
+-- Returns a list of tuples, one tuple for each file in the info dictionary
 getFiles :: BEncode -> [([FilePath],Integer)]
 getFiles (BList (BDict map:xs)) = (pathlist,len) : getFiles (BList xs)
                                 where (Just (BInt len))   = M.lookup "length" map
@@ -55,34 +58,41 @@ getRootPath be = fmap extractString (successiveLookup ["info","name"] be)
 decodePath :: [BEncode] -> [FilePath]
 decodePath = map extractString
 
+-- A helper function to perform nested look ups in the BDict Map
 successiveLookup :: [String] -> BEncode -> Maybe BEncode
 successiveLookup [] be = Just be
 successiveLookup (x:xs) (BDict bd) = maybe Nothing (successiveLookup xs) (M.lookup x bd)
 successiveLookup _ _ = Nothing
 
+-- A helper function for the pieceHashList function
 splitPieceHash :: BL.ByteString -> [BL.ByteString]
 splitPieceHash piecehash = case BL.length piecehash > 0 of
                                True -> head : splitPieceHash piecehash'
                                     where (head,piecehash') = BL.splitAt (fromIntegral lenHash) piecehash
                                _    -> []
 
+-- Returns a list of 20 byte SHA 1 hashes corresponding to each piece
 pieceHashList :: BEncode -> Maybe [BL.ByteString]
 pieceHashList be = case successiveLookup ["info","pieces"] be of
                         (Just (BString bs)) -> Just $ splitPieceHash bs
                         _                   -> Nothing
 
+-- Given the FileList, computes the overall size of the download
 getOverallSize :: FileList -> Integer
 getOverallSize = V.foldr ((+) . getSize) 0
 
+-- Reads the piece length from the info dictionary
 readPieceLength :: BEncode -> Maybe Integer
 readPieceLength be = case successiveLookup ["info","piece length"] be of
                       (Just (BInt len)) -> Just len
                       _                 -> Nothing
 
+-- Given total size and piece length, returns the list of piece lengths of all the pieces
 pieceLengthList :: Integer -> Integer -> [Int]
 pieceLengthList totalSize pieceLength = replicate (fromIntegral $ quot totalSize pieceLength) (fromIntegral pieceLength) ++ last
                                       where last = if mod totalSize pieceLength == 0 then [] else [fromIntegral $ mod totalSize pieceLength]
 
+-- Sets up the PieceInfo Vector for this torrent
 setPieceInfo :: [Int] -> [BL.ByteString] -> FileList -> PieceInfo
 setPieceInfo lenList hashList fileList = V.fromList $ zipWith3 SinglePieceInfo lenList (map Hash hashList) (coveredFileList fileList (map fromIntegral lenList))
 
@@ -97,6 +107,7 @@ announceList be = case successiveLookup ["announce-list"] be of
 
 -- Handle HTTPS?
 -- Test for isJust?
+-- Parses a given URL and returns the corresponding Tracker object
 uriToTracker :: String -> Tracker
 uriToTracker uri = case filter isLetter $ uriScheme parsedURI of
                            "http" -> HTTPTracker uri
@@ -115,9 +126,6 @@ extractTrackers be = case announceList be
                            Nothing -> if isJust (successiveLookup ["announce"] be)
                                       then Just [uriToTracker $ extractString $ fromJust $ successiveLookup ["announce"] be]
                                       else Nothing
-
-runningSum :: [Integer] -> [Integer]
-runningSum = scanl1 (+)
 
 -- Makes list of endpoints lying in either filePositionList or piecePositionList
 rmdups :: [Integer] -> [Integer] -> [Integer]
@@ -147,11 +155,14 @@ coveredFileList fileList pieceLengthList = map g $ allSplit filePositionList $ p
                                                f (a,b,c)          = CoveredFile (getFilePath $ (V.!) fileList (fromIntegral a)) b (fromIntegral c)
                                                g a                = V.fromList $ map f a
 
+-- Randomly generates the peer ID which will be used by us
 genPeerID :: IO BL.ByteString
 genPeerID = do let randomWord8 = getStdRandom random :: IO Word8
                word8List <- replicateM lenHash randomWord8
                return $ BL.pack word8List
 
+-- Makes a UDP socket which will be used for all the communication with UDP trackers
+-- An arbitrary free port is chosen here. This port will we reused for binding all the future sockets created
 makeUDPSock :: IO Socket
 makeUDPSock = do sock <- socket AF_INET Datagram defaultProtocol
                  setSocketOption sock ReuseAddr 1
@@ -159,6 +170,7 @@ makeUDPSock = do sock <- socket AF_INET Datagram defaultProtocol
                  bind sock (SockAddrInet aNY_PORT iNADDR_ANY)
                  return sock
 
+-- Makes a TCP socket to listen for incoming peer connections
 listeningTCP :: PortNumber -> IO Socket
 listeningTCP udpPort = do sock <- socket AF_INET Stream defaultProtocol
                           setSocketOption sock ReuseAddr 1
@@ -167,6 +179,7 @@ listeningTCP udpPort = do sock <- socket AF_INET Stream defaultProtocol
                           listen sock 2
                           return sock
 
+-- Performs checks necessary for extracting data from the .torrent file
 performChecks :: Maybe BEncode -> Bool
 performChecks (Just be) = all ($ be) [
                                          isJust . getRootPath,
@@ -178,6 +191,7 @@ performChecks (Just be) = all ($ be) [
                                      ]
 performChecks _         = False
 
+-- Reads the .torrent file, sets up the stateless data and creates all the files
 setStateless :: FilePath -> IO (Maybe Stateless)
 setStateless torrentFile = do maybeBE             <- readAndDecode torrentFile
                               if performChecks maybeBE
@@ -195,20 +209,25 @@ setStateless torrentFile = do maybeBE             <- readAndDecode torrentFile
                                       return $ Just $ Stateless infoHash pieceInfo (Hash peerID) trackerList fileList tcpSocket udpSocket
                               else return Nothing
 
+-- Randomly generates the piece download order
 randomPerm :: (Integral a) => a -> IO [a]
 randomPerm numPieces = shuffleM [0..(numPieces-1)]
 
+-- Initialises all the blocks for a single piece
 setBlocks :: Int -> Int -> [(Int,Block)]
 setBlocks pieceLength pieceOffset = if pieceLength > blockLength
                                     then (pieceOffset,Block False BL.empty pieceOffset blockLength):setBlocks (pieceLength - blockLength) (pieceOffset+blockLength)
                                     else [(pieceOffset,Block False BL.empty pieceOffset pieceLength)]
 
+-- Initialises a single stateful Piece
 setPiece :: SinglePieceInfo -> Piece
 setPiece SinglePieceInfo { getPieceLength = pieceLen } = Piece False $ M.fromList (setBlocks pieceLen 0)
 
+-- Sets up the stateful piece list
 setPieceList :: PieceInfo -> PieceList
 setPieceList = V.map setPiece
 
+-- Sets up the initial Torrent state
 setStateful :: Stateless -> IO Torrent
 setStateful constants = do let pieces = setPieceList $ getPieceInfo constants
                            pieceOrd <- randomPerm $ V.length pieces
