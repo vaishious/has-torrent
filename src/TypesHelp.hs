@@ -7,6 +7,9 @@ import qualified Data.Vector as V
 import qualified Data.Set as S
 import qualified Data.List.Zipper as Z
 
+lenHash :: (Integral a) => a
+lenHash = 20
+
 requestTime :: (Num a) => a
 requestTime = 120
 

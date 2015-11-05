@@ -95,9 +95,9 @@ parseHandshake constants = do bs <- get
                                       then do let (pStrByteString,bs) = runState (statefulSplit len) bs
                                               if LC.unpack pStrByteString == pStr
                                               then do let (reserved,bs) = runState (statefulSplit 8) bs     -- Do we need to check reserved bytes?
-                                                      let (infoHash,bs) = runState (statefulSplit 20) bs
+                                                      let (infoHash,bs) = runState (statefulSplit lenHash) bs
                                                       if infoHash == getHash (getInfoHash constants)
-                                                      then do let (peerId,bs) = runState (statefulSplit 20) bs
+                                                      then do let (peerId,bs) = runState (statefulSplit lenHash) bs
                                                               put bs
                                                               return True
                                                       else return False

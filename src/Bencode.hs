@@ -24,9 +24,6 @@ import qualified Data.Set as S
 import System.Random.Shuffle (shuffleM)
 import qualified Data.List.Zipper as Z
 
-lenHash :: Int
-lenHash = 20
-
 readAndDecode :: FilePath -> IO (Maybe BEncode)
 readAndDecode fp = do bs <- BL.readFile fp
                       return $ bRead bs
