@@ -8,7 +8,6 @@ import Control.Concurrent
 import Control.Monad.State
 import Control.Monad.Writer
 import Crypto.Hash.SHA1
-import Data.Byteable
 import Data.ByteString.Builder
 import Data.Int
 import Data.Maybe
@@ -26,14 +25,17 @@ import System.Random
 import Control.Applicative
 import Data.Time
 
+-- Makes a TCP socket on the port which is used by the UDP socket and then connect to the Peer
 makeTCPSock :: Socket -> SockAddr -> IO Socket
 makeTCPSock sockUDP peerAddr = do bindAddr <- getSocketName sockUDP
                                   sockTCP <- socket AF_INET Stream defaultProtocol
                                   setSocketOption sockTCP ReuseAddr 1
+                                  setSocketOption sockTCP ReusePort 1
                                   bind sockTCP bindAddr
                                   connect sockTCP peerAddr
                                   return sockTCP
 
+-- Sends a successful handshake to a peer
 sendHandshake :: Peer -> Stateless -> IO Peer
 sendHandshake (NoHandshakeSent peerAddr) constants = do sockPeer <- makeTCPSock (getUDPSocket constants) peerAddr
                                                         send sockPeer (toLazyByteString $ execWriter $ do
@@ -45,6 +47,7 @@ sendHandshake (NoHandshakeSent peerAddr) constants = do sockPeer <- makeTCPSock 
                                                         return $ NoHandshakeRecvd peerAddr sockPeer BL.empty
 sendHandshake peer _ = return peer
 
+-- Receives a handshake from the peer, parses it (if possible) and returns the new peer
 recvHandshake :: Peer -> Stateless -> IO Peer
 recvHandshake peer@(NoHandshakeRecvd {}) constants = do peer <- recvDataPeer peer
                                                         let (handshakeSucc,rest) = runState (parseHandshake constants) $ getUnparsed peer
@@ -65,21 +68,6 @@ recvDataPeer (NoHandshakeSent sockaddr) = return $ NoHandshakeSent sockaddr
 recvDataPeer peer= do mayRecvd <- timeout 1000 $ recv (getSocket peer) (1024 * 128)
                       case mayRecvd of Nothing -> return peer
                                        (Just recvd) -> appendDataPeer peer recvd
-
-expectedHash :: Stateless -> Int -> BL.ByteString
-expectedHash constants index = getHash $ getPieceHash $ getPieceInfo constants V.! index
-
-computedHash :: Torrent -> Int -> BL.ByteString
-computedHash torrent index = BL.fromStrict $ toBytes $ hashlazy $ getPieceData $ getPieces torrent V.! index
-
-eraseBlockData :: Block -> Block
-eraseBlockData block = block{ getDownloadStatus = False, getData = BL.empty }
-
-erasePieceData :: Piece -> Piece
-erasePieceData piece = piece{ getBlocks = M.map eraseBlockData $ getBlocks piece }
-
-setVerifiedStatus :: Piece -> Piece
-setVerifiedStatus piece = piece{ getVerifiedStatus = True }
 
 verifyHashAndWrite :: Int -> Stateless -> StateT Torrent IO ()
 verifyHashAndWrite index constants = do torrent <- get

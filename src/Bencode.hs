@@ -15,7 +15,6 @@ import qualified Data.Vector as V
 import qualified Data.ByteString.Lazy.Char8 as LC
 import qualified Data.Text as T
 import Data.Text.Encoding
-import Data.Byteable
 import Network.URI
 import Network.Socket
 import Data.Char
@@ -33,7 +32,7 @@ readAndDecode fp = do bs <- BL.readFile fp
                       return $ bRead bs
 
 findInfoHash :: BEncode -> Maybe BL.ByteString
-findInfoHash (BDict be) = fmap (BL.fromStrict . toBytes . hashlazy . bPack) (M.lookup "info" be)
+findInfoHash (BDict be) = fmap (BL.fromStrict . hashlazy . bPack) (M.lookup "info" be)
 findInfoHash _          = Nothing
 
 readFileDict :: BEncode -> Maybe BEncode
@@ -156,12 +155,14 @@ genPeerID = do let randomWord8 = getStdRandom random :: IO Word8
 makeUDPSock :: IO Socket
 makeUDPSock = do sock <- socket AF_INET Datagram defaultProtocol
                  setSocketOption sock ReuseAddr 1
+                 setSocketOption sock ReusePort 1
                  bind sock (SockAddrInet aNY_PORT iNADDR_ANY)
                  return sock
 
 listeningTCP :: PortNumber -> IO Socket
 listeningTCP udpPort = do sock <- socket AF_INET Stream defaultProtocol
                           setSocketOption sock ReuseAddr 1
+                          setSocketOption sock ReusePort 1
                           bind sock (SockAddrInet udpPort iNADDR_ANY)
                           listen sock 2
                           return sock

@@ -7,6 +7,7 @@ import qualified Data.Map.Lazy as M
 import qualified Data.Vector as V
 import qualified Data.Set as S
 import qualified Data.List.Zipper as Z
+import Crypto.Hash.SHA1 (hashlazy)
 
 lenHash :: (Integral a) => a
 lenHash = 20
@@ -85,3 +86,18 @@ initPeerState = PeerState True False True False
 
 zipLength :: Z.Zipper a -> Int
 zipLength (Z.Zip x y) = length x + length y
+
+expectedHash :: Stateless -> Int -> BL.ByteString
+expectedHash constants index = getHash $ getPieceHash $ getPieceInfo constants V.! index
+
+computedHash :: Torrent -> Int -> BL.ByteString
+computedHash torrent index = BL.fromStrict $ hashlazy $ getPieceData $ getPieces torrent V.! index
+
+eraseBlockData :: Block -> Block
+eraseBlockData block = block{ getDownloadStatus = False, getData = BL.empty }
+
+erasePieceData :: Piece -> Piece
+erasePieceData piece = piece{ getBlocks = M.map eraseBlockData $ getBlocks piece }
+
+setVerifiedStatus :: Piece -> Piece
+setVerifiedStatus piece = piece{ getVerifiedStatus = True }
