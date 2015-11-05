@@ -32,6 +32,9 @@ reservedBytes = BL.replicate 8 0
 blockLength :: (Integral a) => a
 blockLength = 16384
 
+runningSum :: (Integral a) => [a] -> [a]
+runningSum = scanl1 (+)
+
 decodeEvent :: (Integral a) => Event -> a
 decodeEvent None = 0
 decodeEvent Completed = 1
