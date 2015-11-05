@@ -92,9 +92,9 @@ extractPeers peerRes = if BL.length peerRes < 6 then Z.empty
                                                          (ip,port) = BL.splitAt 4 first
                                                      in NoHandshakeSent (SockAddrInet (fromIntegral (decode port :: Word16)) (decode ip :: Word32)) `Z.insert` extractPeers rest
 
-getPeers :: Tracker -> Stateless -> Torrent -> IO PeerList
-getPeers udpTracker constants stateful = do trackerAddr <- makeSockAddr udpTracker
-                                            -- Tracker timeout for each connect set to 30 seconds. Change?
-                                            maybeConnect <- sendConnectReq (getUDPSocket constants) trackerAddr 30
-                                            case maybeConnect of Nothing -> return Z.empty
-                                                                 Just connId -> sendAnnounceReq connId trackerAddr constants 30 stateful
+getPeersUDP :: Tracker -> Stateless -> Torrent -> IO PeerList
+getPeersUDP udpTracker constants stateful = do trackerAddr <- makeSockAddr udpTracker
+                                               -- Tracker timeout for each connect set to 30 seconds. Change?
+                                               maybeConnect <- sendConnectReq (getUDPSocket constants) trackerAddr 30
+                                               case maybeConnect of Nothing -> return Z.empty
+                                                                    Just connId -> sendAnnounceReq connId trackerAddr constants 30 stateful
