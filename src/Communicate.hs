@@ -88,6 +88,7 @@ parseMessages = do bs <- get
                            xs <- parseMessages
                            return (fromJust maybeMsg:xs)
 
+-- Parse the handshake from the unparsed message if the length unparsed length is greater than that of the handshake expected
 parseHandshake :: Stateless -> State BL.ByteString Bool
 parseHandshake constants = do bs <- get
                               if BL.length bs >= 49 + fromIntegral (length pStr)

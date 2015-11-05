@@ -1,4 +1,6 @@
-module PeerProtocol where
+module PeerProtocol (
+                        download,
+                    ) where
 import File
 import Types
 import TypesHelp
@@ -77,6 +79,9 @@ verifyHashAndWrite index constants = do torrent <- get
                                                 put torrent{getPieces = pieces}
                                         else do let pieces = (V.//) (getPieces torrent) [(index,erasePieceData $ getPieces torrent V.! index)]
                                                 put torrent{getPieceDownOrd = getPieceDownOrd torrent ++ [index], getPieces = pieces}
+
+download :: Stateless -> StateT Torrent IO ()
+download = checkAndAddPieces
 
 checkAndAddPieces :: Stateless -> StateT Torrent IO ()
 checkAndAddPieces constants = do torrent <- get
