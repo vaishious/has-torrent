@@ -1,4 +1,5 @@
 module Types where
+
 import qualified Data.Vector as V
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Map.Lazy as M

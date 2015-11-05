@@ -1,5 +1,6 @@
 module TypesHelp where
 import Types
+
 import Data.Int
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Map.Lazy as M

@@ -2,7 +2,10 @@ module Bencode (
                    setStateless,
                    setStateful,
                ) where
+import Types
 import TypesHelp
+import File
+
 import Data.BEncode
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Map as M
@@ -13,13 +16,11 @@ import qualified Data.ByteString.Lazy.Char8 as LC
 import qualified Data.Text as T
 import Data.Text.Encoding
 import Data.Byteable
-import Types
 import Network.URI
 import Network.Socket
 import Data.Char
 import Data.Maybe
 import Data.List
-import File
 import Control.Monad (replicateM)
 import System.Random
 import Data.Word

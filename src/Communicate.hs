@@ -2,9 +2,10 @@ module Communicate (
                        parseHandshake,
                        peerMessages,
                        msgToByteStr,
-                   )where
+                   ) where
 import Types
 import TypesHelp
+
 import Control.Monad.Writer
 import Control.Monad.State
 import qualified Data.ByteString.Lazy as BL
