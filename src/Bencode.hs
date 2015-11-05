@@ -48,10 +48,13 @@ getFiles (BList (BDict map:xs)) = (pathlist,len) : getFiles (BList xs)
                                       pathlist            = decodePath list
 getFiles _                      = []
 
+-- Converts the BEncoded ByteString to a String while taking care of UTF-8 format
+-- Use this function. Don't try to use a simple unpack function
 extractString :: BEncode -> String
 extractString (BString str) = T.unpack $ decodeUtf8 $ LC.toStrict str
 extractString _ = ""
 
+-- Get the folder name for the root directory of all files
 getRootPath :: BEncode -> Maybe FilePath
 getRootPath be = fmap extractString (successiveLookup ["info","name"] be)
 
@@ -96,10 +99,11 @@ pieceLengthList totalSize pieceLength = replicate (fromIntegral $ quot totalSize
 setPieceInfo :: [Int] -> [BL.ByteString] -> FileList -> PieceInfo
 setPieceInfo lenList hashList fileList = V.fromList $ zipWith3 SinglePieceInfo lenList (map Hash hashList) (coveredFileList fileList (map fromIntegral lenList))
 
--- What if input is not of the type (BList a)?
+-- Get the list of strings for each entry in 'announce-list'
 announceURL :: BEncode -> [String]
 announceURL (BList urlList) = map extractString urlList
 
+-- Get a list of all strings without randomizing each list in 'announce-list'
 announceList :: BEncode -> Maybe [String]
 announceList be = case successiveLookup ["announce-list"] be of
                           (Just (BList announceList)) -> Just $ concatMap announceURL announceList
@@ -120,6 +124,8 @@ uriToTracker uri = case filter isLetter $ uriScheme parsedURI of
 readTrackerList :: [String] -> TrackerList
 readTrackerList = map uriToTracker
 
+-- Extract the trackers from the BEncoded data type safely
+-- If 'announce-list' is present then extract all of them. If not then just get the tracker from 'announce' (if not corrupt)
 extractTrackers :: BEncode -> Maybe TrackerList
 extractTrackers be = case announceList be
                         of Just uriList -> Just $ readTrackerList uriList
