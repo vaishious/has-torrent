@@ -26,6 +26,7 @@ import System.Timeout
 import System.Random
 import Control.Applicative
 import Data.Time
+import System.Log.Logger
 import Control.Exception
 
 -- Makes a TCP socket on the port which is used by the UDP socket and then connect to the Peer
@@ -35,10 +36,13 @@ makeTCPSock sockUDP peerAddr = do bindAddr <- getSocketName sockUDP
                                   setSocketOption sockTCP ReuseAddr 1
                                   setSocketOption sockTCP ReusePort 1
                                   bind sockTCP bindAddr
+                                  infoM "HasTorrent" $ "About to connect to "++(show peerAddr)
                                   mayConnect <- timeout 100000 $ connect sockTCP peerAddr
                                   case mayConnect of Nothing -> do close sockTCP
+                                                                   infoM "HasTorrent" $ "Not Connected to Peer "++(show peerAddr)
                                                                    return Nothing
-                                                     Just _  -> return $ Just sockTCP
+                                                     Just _  -> do infoM "HasTorrent" $ "Connected to Peer "++(show peerAddr)
+                                                                   return $ Just sockTCP
 
 -- Sends a successful handshake to a peer
 sendHandshake :: Peer -> Stateless -> IO Peer
@@ -49,12 +53,14 @@ sendHandshake peer@(NoHandshakeSent peerAddr) constants = do poss <- try (makeTC
                                                                   if isNothing maybeSock
                                                                   then return peer
                                                                   else do let sockPeer = fromJust maybeSock
+                                                                          infoM "HasTorrent" $ "About to send Handshake to "++(show peerAddr)
                                                                           send sockPeer (toLazyByteString $ execWriter $ do
                                                                                                  tell $ int8 pStrLen
                                                                                                  tell $ string8 pStr
                                                                                                  tell $ lazyByteString reservedBytes
                                                                                                  tell $ lazyByteString $ getHash $ getInfoHash constants
                                                                                                  tell $ lazyByteString $ getHash $ getPeerId constants)
+                                                                          infoM "HasTorrent" $ "Handshake sent to "++(show peerAddr)
                                                                           return $ NoHandshakeRecvd peerAddr sockPeer BL.empty
 sendHandshake peer _ = return peer
 
@@ -64,6 +70,7 @@ recvHandshake peer@(NoHandshakeRecvd {}) constants = do peer <- recvDataPeer pee
                                                         let (handshakeSucc,rest) = runState (parseHandshake constants) $ getUnparsed peer
                                                         if handshakeSucc
                                                         then do time <- getCurrentTime
+                                                                infoM "HasTorrent" $ "Handshake successfully received from "++(show $ getPeerAddress peer)
                                                                 return $ Handshake (getPeerAddress peer) initPeerState (getSocket peer) rest [] time time time []
                                                         else return peer
 recvHandshake peer _ = return peer
@@ -84,9 +91,11 @@ verifyHashAndWrite :: Int -> Stateless -> StateT Torrent IO ()
 verifyHashAndWrite index constants = do torrent <- get
                                         if computedHash torrent index == expectedHash constants index
                                         then do lift $ forkIO $ writePiece index constants torrent
+                                                lift $ infoM "HasTorrent" ("Piece number "++(show index)++" has been written to disk")
                                                 let pieces = (V.//) (getPieces torrent) [(index,setVerifiedStatus $ getPieces torrent V.! index)]
                                                 put torrent{getPieces = pieces}
                                         else do let pieces = (V.//) (getPieces torrent) [(index,erasePieceData $ getPieces torrent V.! index)]
+                                                lift $ infoM "HasTorrent" ("Piece number "++(show index)++" hash failed")
                                                 put torrent{getPieceDownOrd = getPieceDownOrd torrent ++ [index], getPieces = pieces}
 
 download :: Stateless -> StateT Torrent IO ()
@@ -155,6 +164,7 @@ inactiveSend constants = do torrent <- get
 
 activePeer :: Stateless -> StateT Torrent IO ()
 activePeer constants = do torrent <- get
+                          lift $ infoM "HasTorrent" "Active Peer"
                           if Z.endp $ getActivePeers torrent
                               then do put torrent{getActivePeers = Z.start $ getActivePeers torrent}
                                       inactivePeer constants
@@ -170,12 +180,14 @@ activePeer constants = do torrent <- get
 
 inactivePeer :: Stateless -> StateT Torrent IO ()
 inactivePeer constants = do torrent <- get
+                            lift $ infoM "HasTorrent" "Inactive Peer"
                             if Z.endp $ getInactivePeers torrent
                                 then do put torrent{getInactivePeers = Z.start $ getInactivePeers torrent}
                                         checkAndAddPieces constants
                                 else do let peer = Z.cursor $ getInactivePeers torrent
                                         case peer of
                                              NoHandshakeSent {} -> do peer <- lift $ sendHandshake peer constants
+                                                                      lift $ infoM "HasTorrent" $ show peer
                                                                       put torrent{getInactivePeers = Z.replace peer $ getInactivePeers torrent}
                                                                       put torrent{getInactivePeers = Z.right $ getInactivePeers torrent}
                                              NoHandshakeRecvd {} -> do peer <- lift $ recvHandshake peer constants
@@ -233,6 +245,7 @@ processedInactiveMessages constants = do torrent <- get
 
 recvdBlockData :: Message -> Stateless -> StateT Torrent IO ()
 recvdBlockData msg constants = do torrent <- get
+                                  lift $ infoM "HasTorrent" "Block data recd."
                                   let peer = Z.cursor $ getActivePeers torrent
                                   when (getPieceIndex msg < V.length (getPieces torrent)) $ do
                                       let piece = getPieces torrent V.! getPieceIndex msg
