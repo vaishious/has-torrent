@@ -120,12 +120,12 @@ announceList be = case successiveLookup ["announce-list"] be of
                           (Just (BList announceList)) -> Just $ concatMap announceURL announceList
                           _                           -> Nothing
 
--- Handle HTTPS?
 -- Test for isJust?
 -- Parses a given URL and returns the corresponding Tracker object
 uriToTracker :: String -> Tracker
 uriToTracker uri = case filter isLetter $ uriScheme parsedURI of
                            "http" -> HTTPTracker uri
+                           "https" -> HTTPTracker uri
                            "udp"  -> let port = uriPort auth
                                      in if null port then UDPTracker (uriRegName auth) 443
                                          else UDPTracker (uriRegName auth) (fromIntegral $ read $ filter isNumber $ uriPort auth)
