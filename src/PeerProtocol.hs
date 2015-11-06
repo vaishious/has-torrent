@@ -28,25 +28,30 @@ import Control.Applicative
 import Data.Time
 
 -- Makes a TCP socket on the port which is used by the UDP socket and then connect to the Peer
-makeTCPSock :: Socket -> SockAddr -> IO Socket
+makeTCPSock :: Socket -> SockAddr -> IO (Maybe Socket)
 makeTCPSock sockUDP peerAddr = do bindAddr <- getSocketName sockUDP
                                   sockTCP <- socket AF_INET Stream defaultProtocol
                                   setSocketOption sockTCP ReuseAddr 1
                                   setSocketOption sockTCP ReusePort 1
                                   bind sockTCP bindAddr
-                                  connect sockTCP peerAddr
-                                  return sockTCP
+                                  mayConnect <- timeout 100000 $ connect sockTCP peerAddr
+                                  case mayConnect of Nothing -> do close sockTCP
+                                                                   return Nothing
+                                                     Just _  -> return $ Just sockTCP
 
 -- Sends a successful handshake to a peer
 sendHandshake :: Peer -> Stateless -> IO Peer
-sendHandshake (NoHandshakeSent peerAddr) constants = do sockPeer <- makeTCPSock (getUDPSocket constants) peerAddr
-                                                        send sockPeer (toLazyByteString $ execWriter $ do
-                                                                                    tell $ int8 pStrLen
-                                                                                    tell $ string8 pStr
-                                                                                    tell $ lazyByteString reservedBytes
-                                                                                    tell $ lazyByteString $ getHash $ getInfoHash constants
-                                                                                    tell $ lazyByteString $ getHash $ getPeerId constants)
-                                                        return $ NoHandshakeRecvd peerAddr sockPeer BL.empty
+sendHandshake peer@(NoHandshakeSent peerAddr) constants = do maybeSock <- makeTCPSock (getUDPSocket constants) peerAddr
+                                                             if isNothing maybeSock
+                                                             then return peer
+                                                             else do let sockPeer = fromJust maybeSock
+                                                                     send sockPeer (toLazyByteString $ execWriter $ do
+                                                                                                 tell $ int8 pStrLen
+                                                                                                 tell $ string8 pStr
+                                                                                                 tell $ lazyByteString reservedBytes
+                                                                                                 tell $ lazyByteString $ getHash $ getInfoHash constants
+                                                                                                 tell $ lazyByteString $ getHash $ getPeerId constants)
+                                                                     return $ NoHandshakeRecvd peerAddr sockPeer BL.empty
 sendHandshake peer _ = return peer
 
 -- Receives a handshake from the peer, parses it (if possible) and returns the new peer
