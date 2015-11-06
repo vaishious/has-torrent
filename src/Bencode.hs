@@ -54,9 +54,9 @@ extractString :: BEncode -> String
 extractString (BString str) = T.unpack $ decodeUtf8 $ LC.toStrict str
 extractString _ = ""
 
--- Get the folder name for the root directory of all files
-getRootPath :: BEncode -> Maybe FilePath
-getRootPath be = fmap extractString (successiveLookup ["info","name"] be)
+-- Get the torrent name for the name of either the file (single file mode) or the root directory of all files (multiple file mode)
+getTorrentPath :: BEncode -> Maybe FilePath
+getTorrentPath be = fmap extractString (successiveLookup ["info","name"] be)
 
 decodePath :: [BEncode] -> [FilePath]
 decodePath = map extractString
@@ -188,7 +188,7 @@ listeningTCP udpPort = do sock <- socket AF_INET Stream defaultProtocol
 -- Performs checks necessary for extracting data from the .torrent file
 performChecks :: Maybe BEncode -> Bool
 performChecks (Just be) = all ($ be) [
-                                         isJust . getRootPath,
+                                         isJust . getTorrentPath,
                                          isJust . readFileDict,
                                          isJust . findInfoHash,
                                          isJust . extractTrackers,
@@ -206,8 +206,8 @@ setStateless torrentFile = do maybeBE             <- readAndDecode torrentFile
                                       udpSocket      <- makeUDPSock
                                       port           <- socketPort udpSocket
                                       tcpSocket      <- listeningTCP port
-                                      let rootPath    = fromJust $ getRootPath be
-                                      fileList       <- createAllFiles rootPath (getFiles (fromJust $ readFileDict be))
+                                      let torrentPath = fromJust $ getTorrentPath be
+                                      fileList       <- createAllFiles torrentPath (getFiles (fromJust $ readFileDict be))
                                       let infoHash    = Hash $ fromJust $ findInfoHash be
                                       let trackerList = fromJust $ extractTrackers be
                                       let pieceLenList = pieceLengthList (getOverallSize fileList) (fromJust $ readPieceLength be)

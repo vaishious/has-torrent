@@ -33,7 +33,7 @@ connectAction = 0
 announceAction :: Int32
 announceAction = 1
 
--- To resolve the name of the UDP Tracker before connecting
+-- To resolve the address of the UDP Tracker before connecting
 -- Can throw Exception. Need to run using try
 makeSockAddr :: Tracker -> IO SockAddr
 makeSockAddr (UDPTracker hostName port) = do trackerIP <- getHostByName hostName

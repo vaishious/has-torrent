@@ -28,7 +28,7 @@ spaceAvailable = getAvailSpace "./"
 
 -- Get relative paths of files from the recursive structure specified in the .torrent file
 fullFoldPath :: FilePath -> [FilePath] -> FilePath
-fullFoldPath rootPath listPath = ("./"++) $ foldl (\pref suff -> pref ++ "/" ++ suff) rootPath listPath
+fullFoldPath torrentPath listPath = ("./"++) $ foldl (\pref suff -> pref ++ "/" ++ suff) torrentPath listPath
 
 -- Create and allocate the entire space for the file
 -- Make sure all parent directories are created before calling
@@ -39,21 +39,21 @@ createAllocFile (File filePath fileSize) = do fileFd <- openFd filePath WriteOnl
 
 -- Given the file in recursive .torrent format create all it's parent directories and the file itself
 createFileWithDir :: FilePath -> [FilePath] -> Integer -> IO ()
-createFileWithDir rootPath listPath fileSize = do createDirectoryIfMissing True $ fullFoldPath rootPath $ init listPath
-                                                  createAllocFile $ File (fullFoldPath rootPath listPath) fileSize
+createFileWithDir torrentPath listPath fileSize = do createDirectoryIfMissing True $ fullFoldPath torrentPath $ init listPath
+                                                     createAllocFile $ File (fullFoldPath torrentPath listPath) fileSize
 
 -- Convert the recursive file from the torrent file to a better data type
 toFile :: FilePath -> ([FilePath],Integer) -> File
-toFile rootPath (listPath,size) = File (fullFoldPath rootPath listPath) size
+toFile torrentPath (listPath,size) = File (fullFoldPath torrentPath listPath) size
 
 -- Convert all files to a better FileList data type format
 readFileList :: FilePath -> [([FilePath],Integer)] -> FileList
-readFileList rootPath files = V.fromList $ map (toFile rootPath) files
+readFileList torrentPath files = V.fromList $ map (toFile torrentPath) files
 
 -- Given all file recursive structures, create all the files, necessary directory structure and return a in formatted FileList data type
 createAllFiles :: FilePath -> [([FilePath],Integer)] -> IO FileList
-createAllFiles rootPath allFiles = do forM_ allFiles $ uncurry (createFileWithDir rootPath)
-                                      return $ readFileList rootPath allFiles
+createAllFiles torrentPath allFiles = do forM_ allFiles $ uncurry (createFileWithDir torrentPath)
+                                         return $ readFileList torrentPath allFiles
 
 
 splitWrite :: BL.ByteString -> [CoveredFile] -> IO ()
