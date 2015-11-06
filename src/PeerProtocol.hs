@@ -26,6 +26,7 @@ import System.Timeout
 import System.Random
 import Control.Applicative
 import Data.Time
+import Control.Exception
 
 -- Makes a TCP socket on the port which is used by the UDP socket and then connect to the Peer
 makeTCPSock :: Socket -> SockAddr -> IO (Maybe Socket)
@@ -41,17 +42,20 @@ makeTCPSock sockUDP peerAddr = do bindAddr <- getSocketName sockUDP
 
 -- Sends a successful handshake to a peer
 sendHandshake :: Peer -> Stateless -> IO Peer
-sendHandshake peer@(NoHandshakeSent peerAddr) constants = do maybeSock <- makeTCPSock (getUDPSocket constants) peerAddr
-                                                             if isNothing maybeSock
-                                                             then return peer
-                                                             else do let sockPeer = fromJust maybeSock
-                                                                     send sockPeer (toLazyByteString $ execWriter $ do
+sendHandshake peer@(NoHandshakeSent peerAddr) constants = do poss <- try (makeTCPSock (getUDPSocket constants) peerAddr) :: IO (Either SomeException (Maybe Socket))
+                                                             case poss of
+                                                               Left _ -> return peer
+                                                               Right maybeSock ->
+                                                                  if isNothing maybeSock
+                                                                  then return peer
+                                                                  else do let sockPeer = fromJust maybeSock
+                                                                          send sockPeer (toLazyByteString $ execWriter $ do
                                                                                                  tell $ int8 pStrLen
                                                                                                  tell $ string8 pStr
                                                                                                  tell $ lazyByteString reservedBytes
                                                                                                  tell $ lazyByteString $ getHash $ getInfoHash constants
                                                                                                  tell $ lazyByteString $ getHash $ getPeerId constants)
-                                                                     return $ NoHandshakeRecvd peerAddr sockPeer BL.empty
+                                                                          return $ NoHandshakeRecvd peerAddr sockPeer BL.empty
 sendHandshake peer _ = return peer
 
 -- Receives a handshake from the peer, parses it (if possible) and returns the new peer
