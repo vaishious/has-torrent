@@ -1,7 +1,8 @@
 {-# LANGUAGE PackageImports #-}
 module File (
                 spaceAvailable,
-                createAllFiles,
+                createMultipleFiles,
+                createSingleFile,
                 writePiece,
             ) where
 import Types
@@ -42,19 +43,27 @@ createFileWithDir :: FilePath -> [FilePath] -> Integer -> IO ()
 createFileWithDir torrentPath listPath fileSize = do createDirectoryIfMissing True $ fullFoldPath torrentPath $ init listPath
                                                      createAllocFile $ File (fullFoldPath torrentPath listPath) fileSize
 
--- Convert the recursive file from the torrent file to a better data type
+-- Convert single recursive file from the torrent file to a better data type
 toFile :: FilePath -> ([FilePath],Integer) -> File
 toFile torrentPath (listPath,size) = File (fullFoldPath torrentPath listPath) size
 
--- Convert all files to a better FileList data type format
+-- Convert all recursive files to a better FileList data type format
 readFileList :: FilePath -> [([FilePath],Integer)] -> FileList
-readFileList torrentPath files = V.fromList $ map (toFile torrentPath) files
+readFileList torrentPath = V.fromList . map (toFile torrentPath)
 
 -- Given all file recursive structures, create all the files, necessary directory structure and return a in formatted FileList data type
-createAllFiles :: FilePath -> [([FilePath],Integer)] -> IO FileList
-createAllFiles torrentPath allFiles = do forM_ allFiles $ uncurry (createFileWithDir torrentPath)
-                                         return $ readFileList torrentPath allFiles
+-- Used when in Multiple File Mode
+createMultipleFiles :: FilePath -> [([FilePath],Integer)] -> IO FileList
+createMultipleFiles torrentPath allFiles = do forM_ allFiles $ uncurry (createFileWithDir torrentPath)
+                                              return $ readFileList torrentPath allFiles
 
+-- Creates a Single File in current directory
+-- Used when in Single File Mode
+createSingleFile :: FilePath -> Integer -> IO FileList
+createSingleFile filePath fileSize = do let relativePath = "./" ++ filePath
+                                        let file = File relativePath fileSize
+                                        createAllocFile file
+                                        return $ V.singleton file
 
 splitWrite :: BL.ByteString -> [CoveredFile] -> IO ()
 splitWrite pieceData (CoveredFile fpath off len:xs) = do fd <- openFd fpath WriteOnly Nothing defaultFileFlags

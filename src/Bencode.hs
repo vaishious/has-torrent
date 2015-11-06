@@ -19,7 +19,7 @@ import Network.Socket
 import Data.Char
 import Data.Maybe
 import Data.List
-import Control.Monad (replicateM)
+import Control.Monad (replicateM, msum)
 import System.Random
 import Data.Word
 import qualified Data.Set as S
@@ -40,6 +40,10 @@ findInfoHash _          = Nothing
 readFileDict :: BEncode -> Maybe BEncode
 readFileDict = successiveLookup ["info","files"]
 
+-- Reads the size of the file (Use when single file)
+readFileLength :: BEncode -> Maybe BEncode
+readFileLength = successiveLookup ["info","length"]
+
 -- Returns a list of tuples, one tuple for each file in the info dictionary
 getFiles :: BEncode -> [([FilePath],Integer)]
 getFiles (BList (BDict map:xs)) = (pathlist,len) : getFiles (BList xs)
@@ -47,6 +51,13 @@ getFiles (BList (BDict map:xs)) = (pathlist,len) : getFiles (BList xs)
                                       (Just (BList list)) = M.lookup "path" map
                                       pathlist            = decodePath list
 getFiles _                      = []
+
+-- Create Files depending on whether to use Single File Mode or Multiple File Mode
+createFiles :: BEncode -> FilePath -> IO FileList
+createFiles be torrentPath = case readFileDict be of
+                             Nothing -> let (Just (BInt length)) = readFileLength be
+                                        in createSingleFile torrentPath length
+                             Just list -> createMultipleFiles torrentPath $ getFiles list
 
 -- Converts the BEncoded ByteString to a String while taking care of UTF-8 format
 -- Use this function. Don't try to use a simple unpack function
@@ -189,7 +200,8 @@ listeningTCP udpPort = do sock <- socket AF_INET Stream defaultProtocol
 performChecks :: Maybe BEncode -> Bool
 performChecks (Just be) = all ($ be) [
                                          isJust . getTorrentPath,
-                                         isJust . readFileDict,
+                                                                -- First check if it multifile mode and then single file mode
+                                         isJust . msum . flip fmap [readFileDict, readFileLength] . flip ($),
                                          isJust . findInfoHash,
                                          isJust . extractTrackers,
                                          isJust . readPieceLength,
@@ -207,7 +219,7 @@ setStateless torrentFile = do maybeBE             <- readAndDecode torrentFile
                                       port           <- socketPort udpSocket
                                       tcpSocket      <- listeningTCP port
                                       let torrentPath = fromJust $ getTorrentPath be
-                                      fileList       <- createAllFiles torrentPath (getFiles (fromJust $ readFileDict be))
+                                      fileList       <- createFiles be torrentPath
                                       let infoHash    = Hash $ fromJust $ findInfoHash be
                                       let trackerList = fromJust $ extractTrackers be
                                       let pieceLenList = pieceLengthList (getOverallSize fileList) (fromJust $ readPieceLength be)
