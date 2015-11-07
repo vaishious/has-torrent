@@ -8,6 +8,7 @@ import Control.Monad.Trans.State
 import Data.List
 import qualified Data.Vector as V
 import qualified Data.List.Zipper as Z
+import System.Log.Logger
 
 getPeers :: Tracker -> Stateless -> Torrent -> IO PeerList
 getPeers udpTracker@(UDPTracker hostName port) = getPeersUDP udpTracker
@@ -18,6 +19,7 @@ addUniquePeers peers = do torrent <- get
                           let inactive = Z.toList $ getInactivePeers torrent
                           let new = Z.toList peers
                           let unique = (new \\ active) \\ inactive
+                          lift $ infoM "HasTorrent" $ show unique
                           put torrent{getInactivePeers = Z.fromList $ inactive ++ unique}
                           return $ length unique
 

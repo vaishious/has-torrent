@@ -18,8 +18,9 @@ import System.Log.Formatter
 
 -- We need to check if sufficient space is available
 main :: IO ()
-main = do fh <- fileHandler "has-torrent.log" DEBUG >>= \lh -> return $ setFormatter lh (simpleLogFormatter "[$time : $loggername : $prio] $msg")
-          sh <- streamHandler stderr DEBUG >>= \lh -> return $ setFormatter lh (simpleLogFormatter "[$time : $loggername : $prio] $msg")
+main = do fh <- fileHandler "has-torrent.log" DEBUG >>= \lh -> return $ setFormatter lh (simpleLogFormatter "[$time : $loggername : $prio] $msg\n")
+          sh <- streamHandler stderr DEBUG >>= \lh -> return $ setFormatter lh (simpleLogFormatter "[$time : $loggername : $prio] $msg\n")
+          updateGlobalLogger rootLoggerName removeHandler
           updateGlobalLogger "HasTorrent" (setHandlers [fh, sh])
           updateGlobalLogger "HasTorrent" (setLevel INFO)
           argList <- getArgs
@@ -31,5 +32,6 @@ main = do fh <- fileHandler "has-torrent.log" DEBUG >>= \lh -> return $ setForma
           return ()
 
 startTorrent :: Stateless -> StateT Torrent IO ()
-startTorrent constants = do findAndAddPeers constants
+startTorrent constants = do
+                            findAndAddPeers constants
                             download constants
