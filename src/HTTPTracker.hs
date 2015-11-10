@@ -1,70 +1,50 @@
 module HTTPTracker where
 import Types
 import TypesHelp
-
-import System.IO
-import Network.URL
-import Network.HTTP
-import Control.Applicative
-import Control.Monad
 import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString.Lazy.Char8 as LC
-import qualified Network.HTTP.Base as B
+import qualified Network.HTTP.Types as T
+import Data.Maybe
 import Language.Haskell.TH.Ppr
+import Network.HTTP
 
-addParam :: Maybe URL -> (String,String) -> Maybe URL
-addParam url (key,val) = case url of
-        Just u -> Just $ add_param u (key,val)
-        Nothing -> Nothing
+formUrlBase :: String -> String -> String -> String
+formUrlBase tracker infoHashEsc peerIdEsc = tracker ++ "?info_hash=" ++ infoHashEsc ++ "&peer_id=" ++ peerIdEsc
 
-formUrl :: String -> [(String,String)] -> Maybe URL
-formUrl url [] = importURL url
-formUrl "" _ = Nothing
-formUrl url param = foldl addParam (importURL url) param
+formUrl :: String -> [Integer] -> String -> String
+formUrl tr (port:up:dw:left:com:[]) event = tr ++ "&port=" ++ show port ++ "&event=" ++ event ++ "&uploaded=" ++ show up ++ "&downloaded=" ++ show dw ++ "&left=" ++ show left ++ "&compact=" ++ show com
 
-getParam :: Integer -> Integer -> Integer -> Integer -> String -> Integer -> Integer -> [(String,String)]
-getParam port up dw left event com num
-        | com == 0 = [("port",show port),("uploaded",show up),("downloaded",show dw),("left",show left),("event",event),("numwant",show num)]
-        | otherwise = [("port",show port),("uploaded",show up),("downloaded",show dw),("left",show left),("event",event),("compact","1"),("numwant",show num)]
+requestUrl :: String -> String -> String -> Integer -> Integer -> Integer -> Integer -> String -> Integer -> String
+requestUrl tr ih pid port up dw left event com = url where
+							base = formUrlBase tr ih pid
+							param = port:up:dw:left:com:[]
+							url = formUrl base param event
 
-getUrl :: String -> String -> String -> String
-getUrl tracker infoHashEsc peerIdEsc = tracker ++ "?" ++ infoHashEsc ++ "&" ++ peerIdEsc
-
-requestUrl :: String -> String -> String -> Integer -> Integer -> Integer -> Integer -> String -> Integer -> Integer -> Maybe URL
-requestUrl tr infoHashEsc peerIdEsc port up dw left event com num = z where
-        tracker = getUrl tr infoHashEsc peerIdEsc
-        param = getParam port up dw left event com num
-        z = formUrl tracker param
-
-checkResponse :: URL -> IO (Maybe String)
-checkResponse url = do
-        response <- simpleHTTP $ getRequest $ exportURL url
-        body <- getResponseBody response
-        code <- getResponseCode response
-        return (if first code == 2 then Just body else Nothing)
-
-first :: (Eq a, Eq b, Eq c) => (a,b,c) -> a
-first (a,b,c) = a
+getEscaped :: Stateless -> Int -> String
+getEscaped constants c = case c of 
+			1 -> bytesToString $ BL.unpack $ BL.fromStrict $ T.urlEncode False (BL.toStrict $ getHash $ getInfoHash constants)
+			2 -> bytesToString $ BL.unpack $ BL.fromStrict $ T.urlEncode False (BL.toStrict $ getHash $ getPeerId constants)
 
 eventToString :: Event -> String
 eventToString e = case decodeEvent e of 1 -> "completed"
                                         3 -> "stopped"
                                         _ -> "started"
 
-checkResult :: Maybe URL -> IO (Maybe String)
-checkResult url = case url of
-        Just u -> checkResponse u
-        Nothing -> return Nothing
+checkResult :: String -> IO (Maybe String)
+checkResult url = do
+		response <- simpleHTTP $ getRequest url
+		body <- getResponseBody response
+		code <- getResponseCode response
+		return (if getCodeStatus code then Just body else Nothing)
 
-byteStringToEscaped :: BL.ByteString -> String
-byteStringToEscaped = B.urlEncode . bytesToString . BL.unpack
+getCodeStatus :: ResponseCode -> Bool
+getCodeStatus (a, b, c) = if a == 2 then True else False
 
 getResponse :: Tracker -> Stateless -> Torrent -> IO (Maybe String)
 getResponse httpTracker constants stateful = checkResult url where
-                                                        url = requestUrl tracker infoHashEsc peerIdEsc 6881 0 dw left event 1 50
-                                                        tracker = getURL httpTracker
-                                                        infoHashEsc = byteStringToEscaped $ getHash (getInfoHash constants)
-                                                        peerIdEsc = byteStringToEscaped $ getHash (getPeerId constants)
-                                                        dw = getDownload $ getPieces stateful
-                                                        left = getLeft $ getPieces stateful
-                                                        event = eventToString $ getEvent stateful
+								url = requestUrl tracker infoHashEsc peerIdEsc 6881 0 dw left event 1
+								tracker = getURL httpTracker
+								infoHashEsc = getEscaped constants 1
+								peerIdEsc = getEscaped constants 2
+								dw = getDownload $ getPieces stateful
+								left = getLeft $ getPieces stateful
+								event = eventToString $ getEvent stateful
