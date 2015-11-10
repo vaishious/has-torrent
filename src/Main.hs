@@ -1,9 +1,5 @@
-import Bencode
-import PeerProtocol
-import Tracker
-import UDPTracker
-import Types
-import TypesHelp
+import HasTorrent
+import PeerAlgorithm
 
 import Data.Maybe
 import Control.Monad

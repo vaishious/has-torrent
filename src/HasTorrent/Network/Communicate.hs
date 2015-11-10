@@ -1,10 +1,10 @@
-module Communicate (
+module HasTorrent.Network.Communicate (
                        parseHandshake,
                        peerMessages,
                        msgToByteStr,
                    ) where
-import Types
-import TypesHelp
+import HasTorrent.Types
+import HasTorrent.Types.TypesHelp
 
 import Control.Monad.Writer
 import Control.Monad.State

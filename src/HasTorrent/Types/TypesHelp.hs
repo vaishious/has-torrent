@@ -1,5 +1,5 @@
-module TypesHelp where
-import Types
+module HasTorrent.Types.TypesHelp where
+import HasTorrent.Types
 
 import Data.Int
 import qualified Data.ByteString.Lazy as BL

@@ -1,12 +1,12 @@
 {-# LANGUAGE PackageImports #-}
-module File (
+module HasTorrent.File (
                 spaceAvailable,
                 createMultipleFiles,
                 createSingleFile,
                 writePiece,
             ) where
-import Types
-import TypesHelp
+import HasTorrent.Types
+import HasTorrent.Types.TypesHelp
 
 import System.IO
 import System.Directory

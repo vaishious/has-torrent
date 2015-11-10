@@ -1,10 +1,7 @@
-module PeerProtocol (
+module PeerAlgorithm (
                         download,
                     ) where
-import File
-import Types
-import TypesHelp
-import Communicate
+import HasTorrent
 
 import Control.Concurrent
 import Control.Monad.State
@@ -28,82 +25,6 @@ import Control.Applicative
 import Data.Time
 import System.Log.Logger
 import Control.Exception
-
--- Makes a TCP socket on the port which is used by the UDP socket and then connect to the Peer
-makeTCPSock :: Socket -> SockAddr -> IO (Maybe Socket)
-makeTCPSock sockUDP peerAddr = do bindAddr <- getSocketName sockUDP
-                                  sockTCP <- socket AF_INET Stream defaultProtocol
-                                  setSocketOption sockTCP ReuseAddr 1
-                                  setSocketOption sockTCP ReusePort 1
-                                  bind sockTCP bindAddr
-                                  infoM "HasTorrent" $ "About to connect to "++ show peerAddr
-
-                                  mayConnect <- timeout 1000000 $ connect sockTCP peerAddr
-                                  case mayConnect of Nothing -> do close sockTCP
-                                                                   infoM "HasTorrent" $ "Not Connected to Peer "++ show peerAddr
-                                                                   return Nothing
-                                                     Just _  -> do infoM "HasTorrent" $ "Connected to Peer "++ show peerAddr
-                                                                   return $ Just sockTCP
-
--- Sends a successful handshake to a peer
-sendHandshake :: Peer -> Stateless -> IO Peer
-sendHandshake peer@(NoHandshakeSent peerAddr) constants = do poss <- try (makeTCPSock (getUDPSocket constants) peerAddr) :: IO (Either SomeException (Maybe Socket))
-                                                             case poss of
-                                                               Left e -> do debugM "HasTorrent" $ show e
-                                                                            return peer
-                                                               Right maybeSock ->
-                                                                  if isNothing maybeSock
-                                                                  then return peer
-                                                                  else do let sockPeer = fromJust maybeSock
-                                                                          infoM "HasTorrent" $ "About to send Handshake to "++ show peerAddr
-                                                                          send sockPeer (toLazyByteString $ execWriter $ do
-                                                                                                 tell $ int8 pStrLen
-                                                                                                 tell $ string8 pStr
-                                                                                                 tell $ lazyByteString reservedBytes
-                                                                                                 tell $ lazyByteString $ getHash $ getInfoHash constants
-                                                                                                 tell $ lazyByteString $ getHash $ getPeerId constants)
-                                                                          infoM "HasTorrent" $ "Handshake sent to "++ show peerAddr
-                                                                          return $ NoHandshakeRecvd peerAddr sockPeer BL.empty
-sendHandshake peer _ = return peer
-
--- Receives a handshake from the peer, parses it (if possible) and returns the new peer
-recvHandshake :: Peer -> Stateless -> IO Peer
-recvHandshake peer@(NoHandshakeRecvd {}) constants = do peer <- recvDataPeer peer
-                                                        case peer of
-                                                            NoHandshakeSent{} -> return peer
-                                                            _ -> do
-                                                               let (handshakeSucc,rest) = runState (parseHandshake constants) $ getUnparsed peer
-                                                               infoM "HasTorrent" "Tried receiving handshake"
-                                                               if handshakeSucc
-                                                               then do time <- getCurrentTime
-                                                                       infoM "HasTorrent" $ "Handshake successfully received from "++ show (getPeerAddress peer)
-                                                                       return $ Handshake (getPeerAddress peer) initPeerState (getSocket peer) rest [] time time time []
-                                                               else return peer
-recvHandshake peer _ = return peer
-
-appendDataPeer :: Peer -> BL.ByteString -> IO Peer
-appendDataPeer (NoHandshakeSent sockaddr) _ = return $ NoHandshakeSent sockaddr
-appendDataPeer peer recvd = if recvd == BL.empty then do debugM "HasTorrent" $ "Closing socket of peer: " ++ show (getPeerAddress peer)
-                                                         close $ getSocket peer
-                                                         return $ NoHandshakeSent $ getPeerAddress peer
-                                                 else return $ peer{getUnparsed = BL.append (getUnparsed peer) recvd}
-
-recvDataPeer :: Peer -> IO Peer
-recvDataPeer (NoHandshakeSent sockaddr) = return $ NoHandshakeSent sockaddr
-recvDataPeer peer= do mayRecvd <- timeout 100000 $ recv (getSocket peer) (1024 * 128)
-                      case mayRecvd of Nothing -> return peer
-                                       (Just recvd) -> appendDataPeer peer recvd
-
-verifyHashAndWrite :: Int -> Stateless -> StateT Torrent IO ()
-verifyHashAndWrite index constants = do torrent <- get
-                                        if computedHash torrent index == expectedHash constants index
-                                        then do lift $ forkIO $ writePiece index constants torrent
-                                                lift $ infoM "HasTorrent" $ "Piece number "++ show index ++" has been written to disk"
-                                                let pieces = (V.//) (getPieces torrent) [(index,setVerifiedStatus $ getPieces torrent V.! index)]
-                                                put torrent{getPieces = pieces}
-                                        else do let pieces = (V.//) (getPieces torrent) [(index,erasePieceData $ getPieces torrent V.! index)]
-                                                lift $ infoM "HasTorrent" $ "Piece number "++ show index ++" hash failed"
-                                                put torrent{getPieceDownOrd = getPieceDownOrd torrent ++ [index], getPieces = pieces}
 
 download :: Stateless -> StateT Torrent IO ()
 download = checkAndAddPieces

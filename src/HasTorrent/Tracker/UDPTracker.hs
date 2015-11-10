@@ -1,8 +1,8 @@
-module UDPTracker (
+module HasTorrent.Tracker.UDPTracker (
                       getPeersUDP,
                   ) where
-import Types
-import TypesHelp
+import HasTorrent.Types
+import HasTorrent.Types.TypesHelp
 
 import Network.Socket hiding (send, sendTo, recv, recvFrom)
 import Network.Socket.ByteString

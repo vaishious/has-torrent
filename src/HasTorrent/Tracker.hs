@@ -1,6 +1,6 @@
-module Tracker where
-import Types
-import UDPTracker
+module HasTorrent.Tracker where
+import HasTorrent.Types
+import HasTorrent.Tracker.UDPTracker
 
 import Control.Monad
 import Control.Monad.Trans

@@ -1,6 +1,6 @@
-module HTTPTracker where
-import Types
-import TypesHelp
+module HasTorrent.Tracker.HTTPTracker where
+import HasTorrent.Types
+import HasTorrent.Types.TypesHelp
 
 import System.IO
 import Network.URL

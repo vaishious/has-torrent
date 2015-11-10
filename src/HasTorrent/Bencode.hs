@@ -1,10 +1,10 @@
-module Bencode (
+module HasTorrent.Bencode (
                    setStateless,
                    setStateful,
                ) where
-import Types
-import TypesHelp
-import File
+import HasTorrent.Types
+import HasTorrent.Types.TypesHelp
+import HasTorrent.File
 
 import Data.BEncode
 import qualified Data.ByteString.Lazy as BL
