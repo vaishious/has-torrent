@@ -62,7 +62,7 @@ minActiveBlocks :: Integral a => a
 minActiveBlocks = 100
 
 minPeerRequests :: Integral a => a
-minPeerRequests = 10
+minPeerRequests = 2
 
 maxActivePeers :: Integral a => a
 maxActivePeers = 30
