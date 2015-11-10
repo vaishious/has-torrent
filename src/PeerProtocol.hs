@@ -37,6 +37,7 @@ makeTCPSock sockUDP peerAddr = do bindAddr <- getSocketName sockUDP
                                   setSocketOption sockTCP ReusePort 1
                                   bind sockTCP bindAddr
                                   infoM "HasTorrent" $ "About to connect to "++ show peerAddr
+
                                   mayConnect <- timeout 1000000 $ connect sockTCP peerAddr
                                   case mayConnect of Nothing -> do close sockTCP
                                                                    infoM "HasTorrent" $ "Not Connected to Peer "++ show peerAddr
@@ -48,7 +49,8 @@ makeTCPSock sockUDP peerAddr = do bindAddr <- getSocketName sockUDP
 sendHandshake :: Peer -> Stateless -> IO Peer
 sendHandshake peer@(NoHandshakeSent peerAddr) constants = do poss <- try (makeTCPSock (getUDPSocket constants) peerAddr) :: IO (Either SomeException (Maybe Socket))
                                                              case poss of
-                                                               Left _ -> return peer
+                                                               Left e -> do debugM "HasTorrent" $ show e
+                                                                            return peer
                                                                Right maybeSock ->
                                                                   if isNothing maybeSock
                                                                   then return peer
@@ -81,7 +83,8 @@ recvHandshake peer _ = return peer
 
 appendDataPeer :: Peer -> BL.ByteString -> IO Peer
 appendDataPeer (NoHandshakeSent sockaddr) _ = return $ NoHandshakeSent sockaddr
-appendDataPeer peer recvd = if recvd == BL.empty then do close $ getSocket peer
+appendDataPeer peer recvd = if recvd == BL.empty then do debugM "HasTorrent" $ "Closing socket of peer: " ++ show (getPeerAddress peer)
+                                                         close $ getSocket peer
                                                          return $ NoHandshakeSent $ getPeerAddress peer
                                                  else return $ peer{getUnparsed = BL.append (getUnparsed peer) recvd}
 
@@ -189,9 +192,8 @@ activePeer constants = do torrent <- get
                                                               activeSend constants
                                                               torrent <- get
                                                               put torrent{getActivePeers = Z.right $ getActivePeers torrent}
-                                                          activePeer constants
-                                        _ -> put torrent{getInactivePeers = Z.push peer $ getInactivePeers torrent,
-                                                         getActivePeers = Z.delete $ getActivePeers torrent}
+                                        _ -> put torrent{getActivePeers = Z.delete $ getActivePeers torrent}
+                                      activePeer constants
 
 inactivePeer :: Stateless -> StateT Torrent IO ()
 inactivePeer constants = do torrent <- get
@@ -203,9 +205,14 @@ inactivePeer constants = do torrent <- get
                                         lift $ debugM "HasTorrent" $ show peer
                                         case peer of
                                              NoHandshakeSent {} -> do peer <- lift $ sendHandshake peer constants
-                                                                      put torrent{getInactivePeers = Z.right $ Z.replace peer $ getInactivePeers torrent}
+                                                                      case peer of
+                                                                        NoHandshakeSent{} -> do
+                                                                            put torrent{getInactivePeers = Z.delete $ getInactivePeers torrent}
+                                                                        _ -> do
+                                                                            put torrent{getInactivePeers = Z.right $ Z.replace peer $ getInactivePeers torrent}
                                              NoHandshakeRecvd {} -> do peer <- lift $ recvHandshake peer constants
                                                                        put torrent{getInactivePeers = Z.right $ Z.replace peer $ getInactivePeers torrent}
+
                                              Handshake{} -> do peer <- lift $ recvDataPeer peer
                                                                case peer of
                                                                  Handshake{} -> do
@@ -228,7 +235,6 @@ processedInactiveMessages constants = do torrent <- get
                                          if null messages then return True
                                          else do
                                             let (msg:rest) = messages
-                                            lift $debugM "HasTorrent" $ "Message Logged: " ++ show msg
                                             time <- lift getCurrentTime
                                             peer <- return $ peer{getResponseTime = time}
                                             case msg of ChokeMsg -> do
@@ -261,7 +267,6 @@ processedInactiveMessages constants = do torrent <- get
                                                                     return False
 
                                                         _ -> do
-                                                            lift $ debugM "HasTorrent" "Fail"
                                                             peer <- return $ peer{getPendingMessages = rest}
                                                             put torrent{getInactivePeers = Z.replace peer $ getInactivePeers torrent}
                                                             processedInactiveMessages constants

@@ -15,6 +15,7 @@ import System.Log.Handler.Syslog
 import System.Log.Handler.Simple
 import System.Log.Handler (setFormatter)
 import System.Log.Formatter
+import Network.Socket (getSocketName)
 
 -- We need to check if sufficient space is available
 main :: IO ()
@@ -27,6 +28,10 @@ main = do fh <- fileHandler "has-torrent.log" DEBUG >>= \lh -> return $ setForma
           let torrentFile = head argList
           maybeConstants <- setStateless torrentFile
           let constants = fromJust maybeConstants
+
+          sockName <- getSocketName $ getTCPSocket constants
+          infoM "HasTorrent" $ "Socket Name: "++ show sockName
+
           torrent <- setStateful constants
           execStateT (startTorrent constants) torrent
           return ()
