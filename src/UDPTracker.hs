@@ -100,7 +100,7 @@ extractPeers :: LC.ByteString -> PeerList
 extractPeers peerRes = if LC.length peerRes < 6 then Z.empty
                                                 else let (first,rest) = LC.splitAt 6 peerRes
                                                          (ip,port) = LC.splitAt 4 first
-                                                     in NoHandshakeSent (SockAddrInet (fromIntegral (decode port :: Word16)) (decode ip :: Word32)) `Z.insert` extractPeers rest
+                                                     in NoHandshakeSent (SockAddrInet (fromIntegral (decode port :: Word16)) (decode (LC.reverse ip) :: Word32)) `Z.insert` extractPeers rest
 
 -- Send a connect followed by an announce to a UDP Tracker and then parse the response appropriately to get the PeerList
 getPeersUDP :: Tracker -> Stateless -> Torrent -> IO PeerList
