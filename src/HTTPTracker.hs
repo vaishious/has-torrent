@@ -37,28 +37,27 @@ checkResult url = do
 		return (if getCodeStatus code then parseOutput body else Nothing)
 
 getIndex :: String -> String -> Int -> Maybe Int
-getIndex str xs val = if z > y
-			then Nothing
-			else if take z str == xs
-				then Just val
-				else getIndex (tail str) xs (val+1) where
-									z = length xs
-									y = length str
+getIndex str xs val 
+		| z > y = Nothing
+		| take z str == xs = Just val
+		| otherwise = getIndex (tail str) xs (val + 1) where
+								z = length xs
+								y = length str
 
 parseOutput :: String -> Maybe String
-parseOutput str = if val == Nothing
+parseOutput str = if isNothing val
 			then Nothing 
 			else trimPeers $ drop (fromJust val) str where
 							val = getIndex str "peers" 0
 			
 trimPeers :: String -> Maybe String
-trimPeers str = if val == Nothing
+trimPeers str = if isNothing val
 			then Nothing
 			else Just $ drop (1 + fromJust val) str where
 				val = getIndex str ":" 0
 
 getCodeStatus :: ResponseCode -> Bool
-getCodeStatus (a, b, c) = if a == 2 then True else False
+getCodeStatus (a, b, c) = a==2
 
 getResponse :: Tracker -> Stateless -> Torrent -> IO (Maybe String)
 getResponse httpTracker constants stateful = checkResult url where
