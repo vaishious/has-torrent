@@ -23,7 +23,7 @@ import qualified Data.Vector as V
 import Control.Monad
 import qualified Data.ByteString.Lazy as BL
 
--- Gives us how much space is available in the current working directory
+-- |Gives us how much space is available in the current working directory
 spaceAvailable :: IO Integer
 spaceAvailable = getAvailSpace "./"
 
@@ -51,13 +51,13 @@ toFile torrentPath (listPath,size) = File (fullFoldPath torrentPath listPath) si
 readFileList :: FilePath -> [([FilePath],Integer)] -> FileList
 readFileList torrentPath = V.fromList . map (toFile torrentPath)
 
--- Given all file recursive structures, create all the files, necessary directory structure and return a in formatted FileList data type
+-- |Given all file recursive structures, create all the files, necessary directory structure and return a in formatted FileList data type
 -- Used when in Multiple File Mode
 createMultipleFiles :: FilePath -> [([FilePath],Integer)] -> IO FileList
 createMultipleFiles torrentPath allFiles = do forM_ allFiles $ uncurry (createFileWithDir torrentPath)
                                               return $ readFileList torrentPath allFiles
 
--- Creates a Single File in current directory
+-- |Creates a Single File in current directory
 -- Used when in Single File Mode
 createSingleFile :: FilePath -> Integer -> IO FileList
 createSingleFile filePath fileSize = do let relativePath = "./" ++ filePath
@@ -73,7 +73,7 @@ splitWrite pieceData (CoveredFile fpath off len:xs) = do fd <- openFd fpath Writ
                                                          splitWrite restData xs
 splitWrite _ [] = return ()
 
--- Writes a piece to the respective files it covers
+-- |Writes a piece to the respective files it covers
 -- Called after the checksum of the piece has been verified
 writePiece :: Int -> Stateless -> Torrent -> IO ()
 writePiece index constants torrent = splitWrite (getPieceData $ getPieces torrent V.! index) $ V.toList $ getCoveredFileList $ getPieceInfo constants V.! index

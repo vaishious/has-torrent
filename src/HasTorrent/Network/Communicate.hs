@@ -88,7 +88,7 @@ parseMessages = do bs <- get
                            xs <- parseMessages
                            return (fromJust maybeMsg:xs)
 
--- Parse the handshake from the unparsed message if the length unparsed length is greater than that of the handshake expected
+-- |Parse the handshake from the unparsed message if the length unparsed length is greater than that of the handshake expected
 parseHandshake :: Stateless -> State BL.ByteString Bool
 parseHandshake constants = do bs <- get
                               if BL.length bs >= 49 + fromIntegral (length pStr)
@@ -102,7 +102,7 @@ parseHandshake constants = do bs <- get
                                       else return True
                               else return False
 
--- Convert the peer (stateful) to a new peer after appending the newly parsed messages using parseMessages
+-- |Convert the peer (stateful) to a new peer after appending the newly parsed messages using parseMessages
 peerMessages :: State Peer ()
 -- Can maybe also be written as Peer -> Peer
 peerMessages = do peer@Handshake{ getUnparsed = bs, getPendingMessages = pMsgs } <- get
@@ -110,7 +110,7 @@ peerMessages = do peer@Handshake{ getUnparsed = bs, getPendingMessages = pMsgs }
                   put peer{ getUnparsed = bs', getPendingMessages = pMsgs++msgList}
                   return ()
 
--- Convert a Message to ByteString to for sending
+-- |Convert a Message to ByteString to for sending
 msgToByteStr :: Message -> BL.ByteString
 msgToByteStr msg = toLazyByteString $ execWriter $ case msg of
                              KeepAliveMsg -> tell $ int32BE 0

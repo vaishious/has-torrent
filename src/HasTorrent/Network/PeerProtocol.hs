@@ -44,7 +44,7 @@ makeTCPSock sockUDP peerAddr = do bindAddr <- getSocketName sockUDP
                                                                    return Nothing
                                                      Just _  -> return $ Just sockTCP
 
--- Sends a successful handshake to a peer
+-- |Sends a successful handshake to a peer
 sendHandshake :: Peer -> Stateless -> IO Peer
 sendHandshake peer@(NoHandshakeSent peerAddr) constants = do poss <- try (makeTCPSock (getUDPSocket constants) peerAddr) :: IO (Either SomeException (Maybe Socket))
                                                              case poss of
@@ -62,7 +62,7 @@ sendHandshake peer@(NoHandshakeSent peerAddr) constants = do poss <- try (makeTC
                                                                           return $ NoHandshakeRecvd peerAddr sockPeer BL.empty
 sendHandshake peer _ = return peer
 
--- Receives a handshake from the peer, parses it (if possible) and returns the new peer
+-- |Receives a handshake from the peer, parses it (if possible) and returns the new peer
 recvHandshake :: Peer -> Stateless -> IO Peer
 recvHandshake peer@(NoHandshakeRecvd {}) constants = do peer <- recvDataPeer peer
                                                         case peer of
@@ -81,13 +81,14 @@ appendDataPeer peer recvd = if recvd == BL.empty then do close $ getSocket peer
                                                          return $ NoHandshakeSent $ getPeerAddress peer
                                                  else return $ peer{getUnparsed = BL.append (getUnparsed peer) recvd}
 
+-- |Receive data from a Peer, with a timeout
 recvDataPeer :: Peer -> IO Peer
 recvDataPeer (NoHandshakeSent sockaddr) = return $ NoHandshakeSent sockaddr
 recvDataPeer peer= do mayRecvd <- timeout 100000 $ recv (getSocket peer) (1024 * 128)
                       case mayRecvd of Nothing -> return peer
                                        (Just recvd) -> appendDataPeer peer recvd
 
--- Verifies if the hash of the piece received matches that given in the torrent file and accordingly writes to disk or resets the piece
+-- |Verifies if the hash of the piece received matches that given in the torrent file and accordingly writes to disk or resets the piece
 verifyHashAndWrite :: Int -> Stateless -> StateT Torrent IO ()
 verifyHashAndWrite index constants = do torrent <- get
                                         if computedHash torrent index == expectedHash constants index

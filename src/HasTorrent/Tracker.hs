@@ -9,11 +9,11 @@ import Data.List
 import qualified Data.Vector as V
 import qualified Data.List.Zipper as Z
 
--- Decide which tracker to use and call the independent module code
+-- |Decide which tracker to use and call the independent module code
 getPeers :: Tracker -> Stateless -> Torrent -> IO PeerList
 getPeers udpTracker@(UDPTracker hostName port) = getPeersUDP udpTracker
 
--- Finds and adds only the unique peers, i.e. ones which are not in the active and inactive lists
+-- |Finds and adds only the unique peers, i.e. ones which are not in the active and inactive lists
 addUniquePeers :: PeerList -> StateT Torrent IO Int
 addUniquePeers peers = do torrent <- get
                           let active = Z.toList $ getActivePeers torrent
@@ -23,7 +23,7 @@ addUniquePeers peers = do torrent <- get
                           put torrent{getInactivePeers = Z.fromList $ inactive ++ unique}
                           return $ length unique
 
--- If the old tracker doesn't give new peers then decide a new tracker based on unique peers we get
+-- |If the old tracker doesn't give new peers then decide a new tracker based on unique peers we get
 findNewTracker :: Stateless -> TrackerList -> StateT Torrent IO ()
 findNewTracker constants [] = return ()
 findNewTracker constants (tracker:xs) = do torrent <- get
@@ -33,7 +33,7 @@ findNewTracker constants (tracker:xs) = do torrent <- get
                                            else do torrent <- get
                                                    put torrent{getActiveTracker = Just tracker}
 
--- Add new peers (if possible) and change the state of the PeerLists and the Active Tracker appropriately
+-- |Add new peers (if possible) and change the state of the PeerLists and the Active Tracker appropriately
 findAndAddPeers :: Stateless -> StateT Torrent IO ()
 findAndAddPeers constants = do torrent <- get
                                case getActiveTracker torrent of

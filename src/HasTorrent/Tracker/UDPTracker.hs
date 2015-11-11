@@ -102,7 +102,7 @@ extractPeers peerRes = if LC.length peerRes < 6 then Z.empty
                                                          (ip,port) = LC.splitAt 4 first
                                                      in NoHandshakeSent (SockAddrInet (fromIntegral (decode port :: Word16)) (decode (LC.reverse ip) :: Word32)) `Z.insert` extractPeers rest
 
--- Send a connect followed by an announce to a UDP Tracker and then parse the response appropriately to get the PeerList
+-- |Send a connect followed by an announce to a UDP Tracker and then parse the response appropriately to get the PeerList
 getPeersUDP :: Tracker -> Stateless -> Torrent -> IO PeerList
 getPeersUDP udpTracker constants stateful = do possibleAddr <- try (makeSockAddr udpTracker) :: IO (Either SomeException SockAddr)
                                                case possibleAddr of
