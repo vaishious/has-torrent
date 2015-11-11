@@ -3,6 +3,7 @@ module HasTorrent.Network.PeerProtocol (
                         recvHandshake,
                         verifyHashAndWrite,
                         recvDataPeer,
+                        sendMessagePeer,
                     ) where
 import HasTorrent.File
 import HasTorrent.Types
@@ -81,12 +82,25 @@ appendDataPeer peer recvd = if recvd == BL.empty then do close $ getSocket peer
                                                          return $ NoHandshakeSent $ getPeerAddress peer
                                                  else return $ peer{getUnparsed = BL.append (getUnparsed peer) recvd}
 
--- |Receive data from a Peer, with a timeout
+-- |Receive data from a Peer, with a timeout and return the new peer
+-- The peer returned is RESET to NoHandshakeSent if the connection was reset (some error on network) or the peer closed the connection. This should be handled by the library user
 recvDataPeer :: Peer -> IO Peer
 recvDataPeer (NoHandshakeSent sockaddr) = return $ NoHandshakeSent sockaddr
-recvDataPeer peer= do mayRecvd <- timeout 100000 $ recv (getSocket peer) (1024 * 128)
-                      case mayRecvd of Nothing -> return peer
-                                       (Just recvd) -> appendDataPeer peer recvd
+recvDataPeer peer= do tryRecv <- try (timeout 100000 $ recv (getSocket peer) (1024 * 128)) :: IO (Either SomeException (Maybe BL.ByteString))
+                      case tryRecv of
+                        Left _ -> return $ NoHandshakeSent $ getPeerAddress peer
+                        Right maybeData -> case maybeData of
+                                             Nothing -> return peer
+                                             Just recvd -> appendDataPeer peer recvd
+
+-- |Send a message to a Peer and return the new peer
+-- The peer returned is RESET to NoHandshakeSent if the connection was reset (some error on network) or the peer closed the connection. This should be handled by the library user
+sendMessagePeer :: Peer -> Message -> IO Peer
+sendMessagePeer peer@Handshake{} msg = do sendAttempt <- try (send (getSocket peer) $ msgToByteStr msg) :: IO (Either SomeException Int64)
+                                          case sendAttempt of
+                                             Left _ -> return $ NoHandshakeSent $ getPeerAddress peer
+                                             Right _ -> return peer
+sendMessagePeer peer _ = return peer
 
 -- |Verifies if the hash of the piece received matches that given in the torrent file and accordingly writes to disk or resets the piece
 verifyHashAndWrite :: Int -> Stateless -> StateT Torrent IO ()
