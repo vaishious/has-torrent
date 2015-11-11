@@ -34,7 +34,28 @@ checkResult url = do
 		response <- simpleHTTP $ getRequest url
 		body <- getResponseBody response
 		code <- getResponseCode response
-		return (if getCodeStatus code then Just body else Nothing)
+		return (if getCodeStatus code then parseOutput body else Nothing)
+
+getIndex :: String -> String -> Int -> Maybe Int
+getIndex str xs val = if z > y
+			then Nothing
+			else if take z str == xs
+				then Just val
+				else getIndex (tail str) xs (val+1) where
+									z = length xs
+									y = length str
+
+parseOutput :: String -> Maybe String
+parseOutput str = if val == Nothing
+			then Nothing 
+			else trimPeers $ drop (fromJust val) str where
+							val = getIndex str "peers" 0
+			
+trimPeers :: String -> Maybe String
+trimPeers str = if val == Nothing
+			then Nothing
+			else Just $ drop (1 + fromJust val) str where
+				val = getIndex str ":" 0
 
 getCodeStatus :: ResponseCode -> Bool
 getCodeStatus (a, b, c) = if a == 2 then True else False
