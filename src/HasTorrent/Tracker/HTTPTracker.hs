@@ -1,8 +1,8 @@
-module HTTPTracker (
-                       getResponse,
-                   ) where
-import Types
-import TypesHelp
+module HasTorrent.Tracker.HTTPTracker (
+                                        getResponse,
+                                      ) where
+import HasTorrent.Types
+import HasTorrent.Types.TypesHelp
 
 import qualified Data.ByteString.Lazy as BL
 import qualified Network.HTTP.Types as T

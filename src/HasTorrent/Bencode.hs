@@ -1,10 +1,10 @@
-module Bencode (
+module HasTorrent.Bencode (
                    setStateless,
                    setStateful,
                ) where
-import Types
-import TypesHelp
-import File
+import HasTorrent.Types
+import HasTorrent.Types.TypesHelp
+import HasTorrent.File
 
 import Data.BEncode
 import qualified Data.ByteString.Lazy as BL
@@ -209,7 +209,7 @@ performChecks (Just be) = all ($ be) [
                                      ]
 performChecks _         = False
 
--- Reads the .torrent file, sets up the stateless data and creates all the files
+-- |Reads the .torrent file, sets up the stateless data and creates all the files
 setStateless :: FilePath -> IO (Maybe Stateless)
 setStateless torrentFile = do maybeBE             <- readAndDecode torrentFile
                               if performChecks maybeBE
@@ -245,7 +245,7 @@ setPiece SinglePieceInfo { getPieceLength = pieceLen } = Piece False $ M.fromLis
 setPieceList :: PieceInfo -> PieceList
 setPieceList = V.map setPiece
 
--- Sets up the initial Torrent state
+-- |Sets up the initial Torrent state
 setStateful :: Stateless -> IO Torrent
 setStateful constants = do let pieces = setPieceList $ getPieceInfo constants
                            pieceOrd <- randomPerm $ V.length pieces

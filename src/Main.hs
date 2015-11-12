@@ -1,9 +1,5 @@
-import Bencode
-import PeerProtocol
-import Tracker
-import UDPTracker
-import Types
-import TypesHelp
+import HasTorrent
+import PeerAlgorithm
 
 import Data.Maybe
 import Control.Monad
@@ -39,4 +35,6 @@ main = do fh <- fileHandler "has-torrent.log" DEBUG >>= \lh -> return $ setForma
 startTorrent :: Stateless -> StateT Torrent IO ()
 startTorrent constants = do
                             findAndAddPeers constants
+                            torrent <- get
+                            lift $ infoM "HasTorrent" $ "Peers: "++ show (getInactivePeers torrent)
                             download constants

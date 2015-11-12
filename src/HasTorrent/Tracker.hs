@@ -1,7 +1,7 @@
-module Tracker where
-import Types
-import UDPTracker
-import HTTPTracker
+module HasTorrent.Tracker where
+import HasTorrent.Types
+import HasTorrent.Tracker.UDPTracker
+import HasTorrent.Tracker.HTTPTracker
 
 import Control.Monad
 import Control.Monad.Trans
@@ -22,22 +22,24 @@ extractPeers peerRes = if LC.length peerRes < 6 then Z.empty
                                                          (ip,port) = LC.splitAt 4 first
                                                      in NoHandshakeSent (SockAddrInet (fromIntegral (decode port :: Word16)) (decode (LC.reverse ip) :: Word32)) `Z.insert` extractPeers rest
 
+-- |Decide which tracker to use and call the independent module code
 getPeers :: Tracker -> Stateless -> Torrent -> IO PeerList
 getPeers udpTracker@UDPTracker{} constants torrent = do bytes <- getPeersUDP udpTracker constants torrent
                                                         return $ extractPeers bytes
 getPeers httpTracker@HTTPTracker{} constants torrent = do bytes <- getResponse httpTracker constants torrent
                                                           return $ extractPeers bytes
 
+-- |Finds and adds only the unique peers, i.e. ones which are not in the active and inactive lists
 addUniquePeers :: PeerList -> StateT Torrent IO Int
 addUniquePeers peers = do torrent <- get
                           let active = Z.toList $ getActivePeers torrent
                           let inactive = Z.toList $ getInactivePeers torrent
                           let new = Z.toList peers
                           let unique = (new \\ active) \\ inactive
-                          lift $ infoM "HasTorrent" $ show unique
                           put torrent{getInactivePeers = Z.fromList $ inactive ++ unique}
                           return $ length unique
 
+-- |If the old tracker doesn't give new peers then decide a new tracker based on unique peers we get
 findNewTracker :: Stateless -> TrackerList -> StateT Torrent IO ()
 findNewTracker constants [] = return ()
 findNewTracker constants (tracker:xs) = do torrent <- get
@@ -47,6 +49,7 @@ findNewTracker constants (tracker:xs) = do torrent <- get
                                            else do torrent <- get
                                                    put torrent{getActiveTracker = Just tracker}
 
+-- |Add new peers (if possible) and change the state of the PeerLists and the Active Tracker appropriately
 findAndAddPeers :: Stateless -> StateT Torrent IO ()
 findAndAddPeers constants = do torrent <- get
                                case getActiveTracker torrent of
