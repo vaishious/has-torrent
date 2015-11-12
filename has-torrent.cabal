@@ -19,11 +19,44 @@ source-repository head
   branch: master
 
 library
-  exposed-modules:     HasTorrent, HasTorrent.Tracker, HasTorrent.Bencode, HasTorrent.Types, HasTorrent.File, HasTorrent.Types.TypesHelp, HasTorrent.Tracker.UDPTracker, HasTorrent.Tracker.HTTPTracker, HasTorrent.Network.PeerProtocol, HasTorrent.Network.Communicate
+  exposed-modules:     HasTorrent
+                     , HasTorrent.Tracker
+                     , HasTorrent.Bencode
+                     , HasTorrent.Types
+                     , HasTorrent.File
+                     , HasTorrent.Types.TypesHelp
+                     , HasTorrent.Tracker.UDPTracker
+                     , HasTorrent.Tracker.HTTPTracker
+                     , HasTorrent.Network.PeerProtocol
+                     , HasTorrent.Network.Communicate
   
   other-extensions:    PackageImports
   
-  build-depends:       base >=4.6 && <4.7, mtl >=2.2 && <2.3, cryptohash >=0.11 && <0.12, bytestring-builder >=0.10 && <0.11, vector >=0.11 && <0.12, ListZipper >=1.2 && <1.3, bytestring >=0.10 && <0.11, containers >=0.5.3 && <0.6, network >=2.6 && <2.7, random >=1.1 && <1.2, time >=1.4 && <1.5, hslogger >=1.2 && <1.3, transformers >=0.4 && <0.5, bencode >=0.6 && <0.7, text >=1.2 && <1.3, network-uri >=2.6 && <2.7, random-shuffle >=0.0 && <0.1, directory >=1.2 && <1.3, unix >=2.7 && <2.8, disk-free-space >=0.1 && <0.2, binary >=0.7 && <0.8, url >=2.1 && <2.2, HTTP >=4000.2 && <4000.3, template-haskell >=2.8 && <2.9, unix-bytestring >=0.3.7.3
+  build-depends:       base >=4.6 && <4.7
+                     , mtl >=2.2 && <2.3
+                     , cryptohash >=0.11 && <0.12
+                     , bytestring-builder >=0.10 && <0.11
+                     , vector >=0.11 && <0.12
+                     , ListZipper >=1.2 && <1.3
+                     , bytestring >=0.10 && <0.11
+                     , containers >=0.5.3 && <0.6
+                     , network >=2.6 && <2.7
+                     , random >=1.1 && <1.2
+                     , time >=1.4 && <1.5
+                     , hslogger >=1.2 && <1.3
+                     , transformers >=0.4 && <0.5
+                     , bencode >=0.6 && <0.7
+                     , text >=1.2 && <1.3
+                     , network-uri >=2.6 && <2.7
+                     , random-shuffle >=0.0 && <0.1
+                     , directory >=1.2 && <1.3
+                     , unix >=2.7 && <2.8
+                     , disk-free-space >=0.1 && <0.2
+                     , binary >=0.7 && <0.8
+                     , url >=2.1 && <2.2
+                     , HTTP >=4000.2 && <4000.3
+                     , template-haskell >=2.8 && <2.9
+                     , unix-bytestring >=0.3.7.3
   
   hs-source-dirs: src 
   
