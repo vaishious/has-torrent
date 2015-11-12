@@ -57,6 +57,7 @@ library
                      , HTTP >=4000.2 && <4000.3
                      , template-haskell >=2.8 && <2.9
                      , unix-bytestring >=0.3.7.3
+                     , http-types >=0.9
   
   hs-source-dirs: src 
   
