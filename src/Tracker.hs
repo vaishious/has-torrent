@@ -1,6 +1,7 @@
 module Tracker where
 import Types
 import UDPTracker
+import HTTPTracker
 
 import Control.Monad
 import Control.Monad.Trans
@@ -8,10 +9,24 @@ import Control.Monad.Trans.State
 import Data.List
 import qualified Data.Vector as V
 import qualified Data.List.Zipper as Z
+import Data.Binary(decode)
+import qualified Data.ByteString.Lazy.Char8 as LC
 import System.Log.Logger
+import Data.Word
+import Network.Socket
+
+-- Parse the peers from the tracker (UDP) announce response
+extractPeers :: LC.ByteString -> PeerList
+extractPeers peerRes = if LC.length peerRes < 6 then Z.empty
+                                                else let (first,rest) = LC.splitAt 6 peerRes
+                                                         (ip,port) = LC.splitAt 4 first
+                                                     in NoHandshakeSent (SockAddrInet (fromIntegral (decode port :: Word16)) (decode (LC.reverse ip) :: Word32)) `Z.insert` extractPeers rest
 
 getPeers :: Tracker -> Stateless -> Torrent -> IO PeerList
-getPeers udpTracker@(UDPTracker hostName port) = getPeersUDP udpTracker
+getPeers udpTracker@UDPTracker{} constants torrent = do bytes <- getPeersUDP udpTracker constants torrent
+                                                        return $ extractPeers bytes
+getPeers httpTracker@HTTPTracker{} constants torrent = do bytes <- getResponse httpTracker constants torrent
+                                                          return $ extractPeers bytes
 
 addUniquePeers :: PeerList -> StateT Torrent IO Int
 addUniquePeers peers = do torrent <- get

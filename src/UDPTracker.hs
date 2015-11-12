@@ -62,7 +62,7 @@ validConnectRes transIdReq response = do guard $ LC.length response >= 16
                                          return connIdRes
 
 -- Send an announce request to the UDP Tracker
-sendAnnounceReq :: LC.ByteString -> SockAddr -> Stateless -> Int -> Torrent -> IO PeerList
+sendAnnounceReq :: LC.ByteString -> SockAddr -> Stateless -> Int -> Torrent -> IO LC.ByteString
 sendAnnounceReq connId trackerAddr constants timeWaitSec stateful = do transIdReq <- randomIO
                                                                        key <- randomIO
                                                                        port <- socketPort $ getUDPSocket constants
@@ -83,8 +83,8 @@ sendAnnounceReq connId trackerAddr constants timeWaitSec stateful = do transIdRe
                                                                             tell $ int16BE $ fromIntegral port) trackerAddr
                                                                        maybeResponse <- timeout (timeWaitSec*100000) $ recv (getUDPSocket constants) 320
                                                                        case liftM LC.fromStrict maybeResponse >>= validAnnounceRes transIdReq of
-                                                                            Nothing -> return Z.empty
-                                                                            Just peerRes -> return $ extractPeers peerRes
+                                                                            Nothing -> return LC.empty
+                                                                            Just peerRes -> return peerRes
 
 -- Check if the Announce Response received is valid or not
 validAnnounceRes :: Int32 -> LC.ByteString -> Maybe LC.ByteString
@@ -95,19 +95,12 @@ validAnnounceRes transIdReq response = do guard $ LC.length response >=20
                                           guard $ (decode transIdRes :: Int32) == transIdReq
                                           return $ LC.drop 12 details
 
--- Parse the peers from the tracker (UDP) announce response
-extractPeers :: LC.ByteString -> PeerList
-extractPeers peerRes = if LC.length peerRes < 6 then Z.empty
-                                                else let (first,rest) = LC.splitAt 6 peerRes
-                                                         (ip,port) = LC.splitAt 4 first
-                                                     in NoHandshakeSent (SockAddrInet (fromIntegral (decode port :: Word16)) (decode (LC.reverse ip) :: Word32)) `Z.insert` extractPeers rest
-
 -- Send a connect followed by an announce to a UDP Tracker and then parse the response appropriately to get the PeerList
-getPeersUDP :: Tracker -> Stateless -> Torrent -> IO PeerList
+getPeersUDP :: Tracker -> Stateless -> Torrent -> IO LC.ByteString
 getPeersUDP udpTracker constants stateful = do possibleAddr <- try (makeSockAddr udpTracker) :: IO (Either SomeException SockAddr)
                                                case possibleAddr of
-                                                 Left _ -> return Z.empty
+                                                 Left _ -> return LC.empty
                                                  Right trackerAddr -> do -- Tracker timeout for each connect set to 30 seconds. Change?
                                                                          maybeConnect <- sendConnectReq (getUDPSocket constants) trackerAddr 30
-                                                                         case maybeConnect of Nothing -> return Z.empty
+                                                                         case maybeConnect of Nothing -> return LC.empty
                                                                                               Just connId -> sendAnnounceReq connId trackerAddr constants 30 stateful
