@@ -86,7 +86,7 @@ appendDataPeer peer recvd = if recvd == BL.empty then do close $ getSocket peer
 -- The peer returned is RESET to NoHandshakeSent if the connection was reset (some error on network) or the peer closed the connection. This should be handled by the library user
 recvDataPeer :: Peer -> IO Peer
 recvDataPeer (NoHandshakeSent sockaddr) = return $ NoHandshakeSent sockaddr
-recvDataPeer peer= do tryRecv <- try (timeout 100000 $ recv (getSocket peer) (1024 * 128)) :: IO (Either SomeException (Maybe BL.ByteString))
+recvDataPeer peer= do tryRecv <- try (timeout 10000 $ recv (getSocket peer) (1024 * 128)) :: IO (Either SomeException (Maybe BL.ByteString))
                       case tryRecv of
                         Left _ -> return $ NoHandshakeSent $ getPeerAddress peer
                         Right maybeData -> case maybeData of

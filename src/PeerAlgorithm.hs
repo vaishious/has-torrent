@@ -49,7 +49,7 @@ makeRequests reqFrom = do torrent <- get
                           unless (length (getRequestList peer) > minPeerRequests || S.size reqFrom == 0) $ do
                               id <- lift $ randomRIO (0, S.size reqFrom - 1)
                               let req = S.elemAt id reqFrom
-                              lift $ send (getSocket peer) $ msgToByteStr $ toReqMsg req
+                              lift $ sendMessagePeer peer $ toReqMsg req
                               time <- lift getCurrentTime
                               peer <- return $ peer{getRequestList = req:getRequestList peer,
                                                     getRequestTime = time}
@@ -63,8 +63,9 @@ activeSend constants = do torrent <- get
                           peer <- return $ peer{getRequestList = pendingList}
                           put torrent{getActivePeers = Z.replace peer $ getActivePeers torrent}
                           torrent <- get
-                          lift $ forM_ completedList $ send (getSocket peer) . msgToByteStr . toCanMsg
+                          lift $ forM_ completedList $ sendMessagePeer peer . toCanMsg
                           time <- lift getCurrentTime
+                          peer <- return $ peer{getRequestTime = time}
                           if diffUTCTime time (getEffResponseTime peer) >= effResponseTime
                           then put torrent{getActivePeers = Z.delete $ getActivePeers torrent,
                                            getInactivePeers = Z.push peer $ getInactivePeers torrent}
@@ -74,7 +75,7 @@ activeSend constants = do torrent <- get
                                   let peer = Z.cursor $ getActivePeers torrent
                                   time <- lift getCurrentTime
                                   when (diffUTCTime time (getRequestTime peer) >= requestTime) $ do
-                                      lift $ send (getSocket peer) $ msgToByteStr KeepAliveMsg
+                                      lift $ sendMessagePeer peer KeepAliveMsg
                                       peer <- return $ peer{getRequestTime = time}
                                       put torrent{getActivePeers = Z.replace peer $ getActivePeers torrent}
 
@@ -87,12 +88,12 @@ inactiveSend constants = do torrent <- get
                                     peer <- return $ NoHandshakeSent $ getPeerAddress peer
                                     put torrent{getInactivePeers = Z.replace peer $ getInactivePeers torrent}
                             else if not $ getAmInterested $ getPeerState peer
-                                 then do lift $ send (getSocket peer) $ msgToByteStr InterestedMsg
+                                 then do lift $ sendMessagePeer peer InterestedMsg
                                          let peerstate = (getPeerState peer){getAmInterested = True}
                                          peer <- return $ peer{getPeerState = peerstate, getRequestTime = time}
                                          put torrent{getInactivePeers = Z.replace peer $ getInactivePeers torrent}
                                  else when (diffUTCTime time (getRequestTime peer) >= requestTime) $ do
-                                             lift $ send (getSocket peer) $ msgToByteStr KeepAliveMsg
+                                             lift $ sendMessagePeer peer KeepAliveMsg
                                              peer <- return $ peer{getRequestTime = time}
                                              put torrent{getInactivePeers = Z.replace peer $ getInactivePeers torrent}
 
