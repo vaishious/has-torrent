@@ -4,7 +4,7 @@ version:             0.1.0.0
 synopsis:            An environment to test and develop Bit Torrent Algorithms
 
 license:             BSD3
-license-file:        LICENSE.md
+license-file:        LICENSE
 author:              Pranav Vaish, R Sundararajan, Aadi Yogakar
 maintainer:          pranav.vaish@gmail.com, dyoucme@gmail.com, ayogakar@gmail.com
 
