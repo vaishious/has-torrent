@@ -22,6 +22,7 @@ Ensure that `ghc` and `cabal` are installed on your system. Building process don
 
     git clone https://github.com/vaishious/has-torrent
     cd has-torrent
+	cabal update
     cabal sandbox init
     cabal install has-torrent
 
