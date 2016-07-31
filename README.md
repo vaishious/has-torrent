@@ -24,7 +24,7 @@ Ensure that `ghc` and `cabal` are installed on your system. Building process don
     cd has-torrent
 	cabal update
     cabal sandbox init
-    cabal install has-torrent
+    cabal install has-torrent.cabal
 
 ##BitTorrent Extension Protocols (BEP) supported
 
