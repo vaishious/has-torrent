@@ -22,9 +22,16 @@ Ensure that `ghc` and `cabal` are installed on your system. Building process don
 
     git clone https://github.com/vaishious/has-torrent
     cd has-torrent
-	cabal update
+    cabal update
     cabal sandbox init
-    cabal install has-torrent
+    cabal install has-torrent.cabal
+    cabal build
+    
+##Running
+
+Run the following command and the download will happen to the folder from which this command was issued. Note that as of now HTTPS trackers are not supported.
+
+    dist/build/has-torrent/has-torrent Path/To/My/TorrentFile
 
 ##BitTorrent Extension Protocols (BEP) supported
 
